@@ -1,0 +1,8 @@
+[package]
+name = "pluto"
+version = "0.1.0"
+authors = ["anselm"]
+edition = "2018"
+
+[dependencies]
+appmanager = { path = "../appmanager" }

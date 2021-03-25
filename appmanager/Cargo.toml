@@ -1,0 +1,9 @@
+[package]
+name = "appmanager"
+version = "0.1.0"
+authors = ["anselm"]
+edition = "2018"
+
+[dependencies]
+rand = "0.5.5"
+lazy_static = "1.4.0"
