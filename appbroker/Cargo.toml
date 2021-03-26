@@ -1,5 +1,5 @@
 [package]
-name = "appmanager"
+name = "appbroker"
 version = "0.1.0"
 authors = ["anselm"]
 edition = "2018"
@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 rand = "0.5.5"
 lazy_static = "1.4.0"
+crossbeam = "0.8.0"

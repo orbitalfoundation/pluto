@@ -1,131 +1,59 @@
 
+/*
 
+Current design,
 
-use std::sync::mpsc::Sender;
-use appmanager::*;
+Apps:
 
+	+ Apps are the core pattern; they are built by developers and "do some work" of some kind
 
+	+ Apps have a single function method call as their entry point, but they can spawn off a thread
 
-// The camera module reads camera hardware (here triggered by a timer)
-fn camera_handler(_mid: MID,message: Message,out_tx: &Sender<Message>) {
+	+ Apps are handed an outbound message channel which lets them talk to a broker that can route traffic
 
-    match message {
+	+ Apps are also handed an inbound message channel for any messages they should process
 
-        // camera does startup, initialize hardware, etc.
-        Message::Startup => {
-            println!("camera: Startup");
-        },
+Pubsub:
 
-        // camera does shutdown
-        Message::Shutdown => {
-            println!("camera: Shutdown");
-        },
+	+ Apps can register to listen to any public message being sent to the broker in general
 
-        // camera receives a timer tick
-        Message::Tick => {
-            println!("camera: Tick");
-            println!("camera: Reading the camera hardware and publishing the video frame.");
-            out_tx.send(
-                Message::App("/frames".to_string(),AppMessage::VideoFrame)
-            ).expect("out_tx.send() failed!");
-        },
+	! Right now messages are copied; later we want some kind of shared memory messaging
 
-        // everything else camera doesn't care about
-        _ => { },
-    }
-}
+	- Later apps should be able to listen specifically to each other more tightly
 
-fn face_detector_handler(mid: MID,message: Message,out_tx: &Sender<Message>) {
-    
-    match message {
+	- Later apps should be able to know what other apps exist and also express dependencies
 
-        // face detector does startup, subscribe to the video topic
-        Message::Startup => {
-            println!("face_detector: Startup");
-            println!("face_detector: Subscribing to topic '/frames'");
-            out_tx.send(
-                Message::Subscribe(mid,"/frames".to_string())
-            ).expect("face_detector: failed to subscribe to topic '/frames'.");
-        },
+	- Later (the main point) apps can load up WASM blobs to basically drive work via scripting
 
-        // face detector does shutdown
-        Message::Shutdown => {
-            println!("face_detector: Shutdown");
-        },
+	- Later the messaging will be a way to enforce security policy between apps
 
-        // face detector gets an AppMessage
-        Message::App(topic,app_message) => {
+Overall:
 
-            match app_message {
+	- I am imagining a 'sea' of "medium sized agents" or "lighterweight apps" or "modules" or "code"
+	- These are not full blown processes isolated by the real operating system kernel or MMU
+	- These are isolated from each other by rust and wasm paradigms; so - basically "softer" walls
+	- I see some of these agents listening to events "in general" similar to javascript DOM listeners
+	- I see some of these agents requiring other agents to exist and then connecting to them
+	- I see security being imposed by controlling the connections
+	- I don't see any other way for agents to communicate; I prefer to control the comms myself
 
-                // face detector receives video frame
-                AppMessage::VideoFrame => {
-                    println!("face_detector: Received video frame from topic '{}'",topic);
-                    println!("face_detector: Detecting face");
-                    out_tx.send(
-                        Message::App("/faces".to_string(),AppMessage::FaceCoords)
-                    ).expect("face_detector: failed to send video frame!");
-                },
+*/
 
-                // and nothing else
-                _ => { },
-            }
-        },
+use appbroker::*;
 
-        // and nothing else
-        _ => { },
-    }
-}
-
-
-fn display_handler(mid: MID,message: Message,out_tx: &Sender<Message>) {
-    
-    match message {
-
-        // display does startup, subscribes to face coordinate topic
-        Message::Startup => {
-            println!("display: Startup");
-            println!("display: Subscribing to topic '/faces'");
-            out_tx.send(
-                Message::Subscribe(mid,"/faces".to_string())
-            ).expect("display: failed to subscribe to topic '/faces'");
-        },
-
-        // display does shutdown
-        Message::Shutdown => {
-            println!("display: Shutdown");
-        },
-
-        // display gets AppMessage
-        Message::App(topic,app_message) => {
-
-            match app_message {
-
-                // new face coordinates
-                AppMessage::FaceCoords => {
-                    println!("display: Received face coordinates from topic '{}'",topic);
-                },
-
-                // and nothing else
-                _ => { },
-            }
-        },
-
-        // and nothing else
-        _ => { },
-    }
-}
-
+mod camera;
+mod face;
+mod display;
 
 fn main() {
 
-	let mut manager = AppManager::new();
+	let mut broker = AppBroker::new();
 
-	manager.add(0,"Camera",display_handler);
-	manager.add(1,"FaceDetector",display_handler);
-	manager.add(2,"Display",display_handler);
+	broker.add("Camera",camera::app);
+	broker.add("Face",face::app);
+	broker.add("Display",display::app);
 
-	manager.run();
+	broker.run();
 
 }
 
