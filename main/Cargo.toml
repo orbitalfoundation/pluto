@@ -5,10 +5,11 @@ authors = ["anselm"]
 edition = "2018"
 
 [dependencies]
-
-appbroker = { path = "../appbroker" }
+rand = "0.8.3"
 crossbeam = "0.8.0"
 wasmtime = "0.25.0"
+
+# appbroker = { path = "../appbroker" }
 
 # bitflags = "1.2.0"
 # libc = "0.2.90"
