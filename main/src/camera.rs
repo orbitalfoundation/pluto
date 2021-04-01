@@ -1,13 +1,12 @@
 
-use crossbeam::channel::Receiver;
-use crossbeam::channel::Sender;
-
+use crossbeam::channel::*;
 use crate::kernel::*;
 
+#[derive(Clone)]
 pub struct Camera {}
 impl Camera {
 	pub fn new() -> Box<dyn Serviceable> {
-		Box::new(Camera {})
+		Box::new(Self {})
 	}
 }
 impl Serviceable for Camera {

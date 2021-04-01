@@ -1,25 +1,13 @@
 
-use std::collections::HashSet;
-use std::collections::HashMap;
-use std::cell::RefCell;
-use crossbeam::channel::unbounded;
-use crossbeam::channel::Receiver;
-use crossbeam::channel::Sender;
-
+use crossbeam::channel::*;
 use crate::kernel::*;
 
-struct ServiceWrapper {
-	pub sid: SID,
-    pub name: String,
-    pub send: Sender<Message>,
-    pub subscriptions: RefCell<HashSet<String>>,
-}
-
+#[derive(Clone)]
 pub struct Broker {
 }
 impl Broker {
 	pub fn new() -> Box<dyn Serviceable> {
-		Box::new(Broker {})
+		Box::new(Self{})
 	}
 }
 impl Serviceable for Broker {
@@ -32,50 +20,58 @@ impl Serviceable for Broker {
 		println!("kernel broker starting {}",_sid);
 
 		let _thread = std::thread::Builder::new().name(name.to_string()).spawn(move || {
-			let mut registry = HashMap::<SID,ServiceWrapper>::new();
+			let mut registry = std::collections::HashMap::<SID,ServiceWrapper>::new();
 		    while let Ok(message) = recv.recv() {
 		    	match message {
-		    		//Message::Stop => {
-		    		//},
-		    		//Message::Start => {
-		    		//},
+
 		            Message::Subscribe(sid,topic) => {
-		                println!("broker: subscribing app {} ('{}') to topic '{}'",sid,registry[&sid].name,topic);
+						// TODO if entry doesn't exist yet it should be manufactured... to allow out of order
+		                println!("Broker: subscribing app {} ('{}') to topic '{}'",sid,registry[&sid].name,topic);
 		                registry[&sid].subscriptions.borrow_mut().insert(topic);
 		            },
-		            //Message::Unsubscribe(sid,topic) => {
-		            //    println!("broker: unsubscribing app {} ('{}') from topic '{}'",sid,registry[&sid].name,topic);
-		            //    registry[&sid].subscriptions.borrow_mut().remove(&topic);
-		            //},
+
+		            Message::Unsubscribe(sid,topic) => {
+		                println!("Broker: unsubscribing app {} ('{}') from topic '{}'",sid,registry[&sid].name,topic);
+		                registry[&sid].subscriptions.borrow_mut().remove(&topic);
+		            },
+
 		            Message::Event(topic,data) => {
-		            	println!("broker: forwarding msg");
 		                for target in &registry {
 		                    if target.1.subscriptions.borrow_mut().contains(&topic) {
 		                        let _res = target.1.send.send(Message::Event(topic.clone(),data.clone()));
 		                    }
 		                }
 		            },
-		    		Message::Add(creator) => {
+
+		    		Message::Add(service) => {
 
 				        let sid: SID = rand::random::<SID>();
 						let (localsend,localrecv) = unbounded::<Message>();
-		    			let thing = creator();
-		    			let name = thing.name();
-		    			thing.start(sid,&send.clone(),&localrecv);
-
-		    			println!("Started handler {}", name );
+		    			let instance = service();
+		    			let name = instance.name();
 
 						let wrapper = ServiceWrapper {
 							sid: sid,
 							name: name.to_string(),
 							send: localsend,
-							subscriptions: RefCell::new(HashSet::new()),
+							subscriptions: std::cell::RefCell::new(std::collections::HashSet::new()),
 						};
 						registry.insert(sid,wrapper);
-						//registry.insert(name,Box::new(thing));
+
+		    			instance.start(sid,&send.clone(),&localrecv);
 
 		    		},
-		    		//_ => {},
+
+		    		Message::Channel(sid,name,channel) =>{
+						let wrapper = ServiceWrapper {
+							sid: sid,
+							name: name.to_string(),
+							send: channel,
+							subscriptions: std::cell::RefCell::new(std::collections::HashSet::new()),
+						};
+						registry.insert(sid,wrapper);
+		    		},
+
 		    	}
 		    }
 		});

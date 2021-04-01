@@ -1,11 +1,5 @@
 
-
-//use std::time::Duration;
-//use std::thread;
-//use crossbeam::channel::unbounded;
-use crossbeam::channel::Receiver;
-use crossbeam::channel::Sender;
-
+use crossbeam::channel::*;
 use wasmtime::*;
 use std::error::Error;
 use std::fmt;
@@ -27,11 +21,12 @@ impl Error for MyError {}
 
 //////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct Wasm {}
 impl Wasm {
-	pub fn new() -> Box<dyn Serviceable> {
-		Box::new(Wasm {})
-	}
+    pub fn new() -> Box<dyn Serviceable> {
+        Box::new(Self{})
+    }
 }
 impl Serviceable for Wasm {
     fn name(&self) -> &str { "Wasm" }
@@ -55,8 +50,10 @@ fn wasm2() -> Result<(), Box<dyn Error>> {
 
     let store = Store::default();
 
-    // TODO -> another way would be to expose functions to the wasm blob similar to wasi
-    // and those function in turn could throw state back up to here
+    // TODO -> this area needs more thought
+    //  - should i register functions that the wasm blob can access - similar to wasi?
+    //  - it feels like a good way for the wasi blob to communicate is to talk to the message service
+    //  - the wasm blob can basically have a thread and simply never return...
 
     // define a callback which wasm blob can call to do some work up here
     let callback_func = Func::wrap(&store, || {
@@ -74,8 +71,6 @@ fn wasm2() -> Result<(), Box<dyn Error>> {
     //let startup = instance.get_func("startup").expect("`startup` was not an exported function");
 
     let startup = instance.get_typed_func::<(),()>("startup")?;
-
-    // TODO - this blob could chose to simply never return and it can keep calling the callback to do work
 
     startup.call(())?;
 

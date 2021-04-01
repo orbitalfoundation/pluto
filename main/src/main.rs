@@ -12,21 +12,10 @@ pub fn main() {
 	let services = [
 		broker::Broker::new,
 		camera::Camera::new,
-		wasm::Wasm::new,
 		tensor::Tensor::new,
-		display::Display::new,
+		wasm::Wasm::new,
+		display::Display::new,	// <- note this last service is greedy and captures the main thread, never returning... it's a winit issue and needs more thought
 	];
 
 	kernel::Kernel::new( &services );
-
-
-    std::thread::sleep(std::time::Duration::from_millis(10000));
-
 }
-
-
-// - camera: can the camera data be fetched better?
-// - camera: don't publish frames, rather have a direct pipe of some kind to caller or wait for commands
-
-
-// - wasm: try move burden of work there
