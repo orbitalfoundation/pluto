@@ -13,9 +13,9 @@ pub fn main() {
 		broker::Broker::new,
 		camera::Camera::new,
 		tensor::Tensor::new,
-		wasm::Wasm::new,
-		display::Display::new,	// <- note this last service is greedy and captures the main thread, never returning... it's a winit issue and needs more thought
+		display::Display::new, // <- note for now this service never returns
 	];
 
 	kernel::Kernel::new( &services );
 }
+

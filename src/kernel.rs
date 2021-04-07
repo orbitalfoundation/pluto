@@ -4,7 +4,21 @@
 
 use crossbeam::channel::*;
 
+///
+/// SID
+/// Service ID
+/// Each service gets a UUID for now for hashed lookup
+/// TODO later may just use name? May have to grant names or somehow prevent collisions
+///
+
 pub type SID = u64;
+
+///
+/// Message
+/// Broker gets all messages for now.
+/// Some messages are routed to other services by broker.
+/// TODO Later services can build direct relationships.
+///
 
 #[derive(Clone)]
 pub enum Message {
@@ -15,6 +29,9 @@ pub enum Message {
 	// listen to any traffic matching a string
     Subscribe(SID,String),
     Unsubscribe(SID,String),
+
+    // Broker Goto - TODO for now special traffic directed at broker is special later perhaps just use ordinary events?
+    BrokerGoto(String),
 
     // Send an event to any traffic matching a string
 	Event(String,String),
@@ -33,7 +50,7 @@ pub enum Message {
 pub trait Serviceable: ServiceableClone {
     fn name(&self) -> &str;
 	fn stop(&self);
-	fn start(&self, sid: SID, send: &Sender<Message>, recv: &Receiver<Message> );
+	fn start(&self, name: String, sid: SID, send: Sender<Message>, recv: Receiver<Message> );
 }
 
 pub trait ServiceableClone {
@@ -70,17 +87,17 @@ impl Kernel {
 	pub fn new(services: &[ServiceBuilder] ) -> Kernel {
 		let (send,recv) = unbounded::<Message>();
 
-		// broker is special; pass it global send/recv channels
-		let _ = services[0]().start(0,&send.clone(),&recv.clone());
+		// broker is expected to be first; start it with vanilla channel endpoints
+		let _ = services[0]().start("broker".to_string(),0,send.clone(),recv.clone());
 
-		// add the rest
+		// start the rest; pass inbound channel and outbound broker channel, also register a channel endpoint with the broker
 		for i in 1..services.len() {
 	        let sid: SID = rand::random::<SID>();
 			let (localsend,localrecv) = unbounded::<Message>();
 			let instance = services[i]();
-			let name = instance.name();
-			let _ = send.send(Message::Channel(sid,name.to_string(),localsend));
-			instance.start(sid,&send.clone(),&localrecv);
+			let name = instance.name().to_string();
+			let _ = send.send(Message::Channel(sid,name.clone(),localsend));
+			instance.start(name,sid,send.clone(),localrecv);
 		}
 
 		Kernel {}
