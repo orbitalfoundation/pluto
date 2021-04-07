@@ -98,6 +98,24 @@ impl ThreeDExampleApp {
             match message {
                 Message::Event(topic,data) => {
                     println!("Display: Received: {} {}",topic, data);
+
+                    match data.as_str() {
+                        "cube" => {
+                            // hack;
+                            // the idea is that i'd be painting some kind of display of the loaded apps
+                            // TODO this has to interogate the broker or somebody to get an enumeration of all apps...
+                            // TODO so this presumes services at that level
+                            let thing = SceneThing { x:0.0, y:0.0, s:0.0, kind:1};
+                            self.world_view.add( thing );
+                        },
+                        _ => {
+
+                            let thing = SceneThing { x:0.0, y:0.0, s:0.0, kind:2};
+                            self.world_view.add( thing );
+
+                        }
+                    }
+ 
                 },
                 _ => { },
             }
@@ -114,14 +132,6 @@ impl ThreeDExampleApp {
             let str = self.textinput.get_value();
             println!("User has asked to load this url: {}",str);
             let _ = self.send.send(Message::BrokerGoto(str));
-
-            // hack;
-            // the idea is that i'd be painting some kind of display of the loaded apps
-            // TODO this has to interogate the broker or somebody to get an enumeration of all apps...
-            // TODO so this presumes services at that level
-            let thing = SceneThing { x:0.0, y:0.0, s:0.0, kind:"cube".to_string()};
-            self.world_view.add( thing );
-
         }
 
         self.world_view.handle_world_view(cx, event);        
@@ -146,12 +156,14 @@ impl ThreeDExampleApp {
 // 3d immediate mode
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// hack; there would be some kind of enum or struct of primitives in some kind of scene graph?
+// hack; and i think there are hashes so that collections belonging to one sponsor are shown depending on foreground app?
 #[derive(Clone)]
 pub struct SceneThing {
     pub x: f64,
     pub y: f64,
     pub s: f64,
-    pub kind: String,
+    pub kind: u32,
 }
 
 #[derive(Clone)]
@@ -221,32 +233,51 @@ impl WorldView {
         
         self.sky_box.draw_sky_box(cx);
         
-        for i in 0..2000{
-            let ti = (i as f32)/4.0 + (self.time*0.1) as f32;
-            let mat = Mat4::txyz_s_ry_rx_txyz(
-                Vec3{x:0.0,y:0.0,z:0.0},
-                1.0,
-                (self.time*15.0) as f32 + ti*10.,(self.time*15.0) as f32,
-                Vec3{x:0.0, y:0.5, z:-1.5} 
-            );
-            self.cube.transform = mat; 
-            self.cube.cube_size = Vec3{x:0.05,y:0.05,z:0.05};
-            self.cube.cube_pos = Vec3{x:ti.sin()*0.8,y:ti.cos()*0.8,z:(ti*3.0).cos()*0.8};
-            self.cube.draw_cube(cx);
-        }
 
-        let mut cube2 = DrawCube::new(cx, default_shader!());
+        // in this hack i'm pretending i have a scene
+        // and then i'm painting what the scene says
+        // ideally i'd only paint the active threads; which the user can select
+
         for x in &self.scene {
-            let mat = Mat4::txyz_s_ry_rx_txyz(
-                Vec3{x:0.0,y:0.0,z:0.0},
-                1.0,0.0,0.0,
-                Vec3{x:0.0, y:0.5, z:-1.5}
-            );
-            cube2.transform = mat;
-            cube2.cube_size=Vec3{x:0.05, y:0.05, z:0.05 };
-            cube2.cube_pos=Vec3{x:0.05,y:0.05,z:0.05};
-            cube2.set_color(cx, Vec4{x:1.0, y:1.0,z:0.0, w:1.0});
-            cube2.draw_cube(cx);
+
+            match x.kind {
+                1 => {
+
+                    let mut cube2 = DrawCube::new(cx, default_shader!());
+
+                    let mat = Mat4::txyz_s_ry_rx_txyz(
+                        Vec3{x:0.0,y:0.0,z:0.0},
+                        1.0,0.0,0.0,
+                        Vec3{x:0.0, y:0.5, z:-1.5}
+                    );
+                    cube2.transform = mat;
+                    cube2.cube_size=Vec3{x:0.05, y:0.05, z:0.05 };
+                    cube2.cube_pos=Vec3{x:0.05,y:0.05,z:0.05};
+                    cube2.set_color(cx, Vec4{x:1.0, y:1.0,z:0.0, w:1.0});
+                    cube2.draw_cube(cx);
+
+                },
+                2 => {
+
+                    for i in 0..2000{
+                        let ti = (i as f32)/4.0 + (self.time*0.1) as f32;
+                        let mat = Mat4::txyz_s_ry_rx_txyz(
+                            Vec3{x:0.0,y:0.0,z:0.0},
+                            1.0,
+                            (self.time*15.0) as f32 + ti*10.,(self.time*15.0) as f32,
+                            Vec3{x:0.0, y:0.5, z:-1.5} 
+                        );
+                        self.cube.transform = mat; 
+                        self.cube.cube_size = Vec3{x:0.05,y:0.05,z:0.05};
+                        self.cube.cube_pos = Vec3{x:ti.sin()*0.8,y:ti.cos()*0.8,z:(ti*3.0).cos()*0.8};
+                        self.cube.draw_cube(cx);
+                    }
+
+                },
+                _ => {
+
+                }
+            }
         }
        
         self.view.end_view(cx,);

@@ -60,28 +60,37 @@ There's some insight we've had already, and here are some of the areas for impro
 
 ### Noted transient bugs / issues to look at
 
-1. general: may make sense to use more generic methods from a trait such as "paint()" rather than paint_a_thing_that_is_an_input_button()
-2. textwidget: emoji?
-3. textwidget: detecting carriage return -> returned events could be richer; also; why one event per call? are these stacked up?
-4. textwidget: text is backwards sometimes
-5. textwidget: width? -> dynamic width is a hassle
-6. linking: packaging dependencies as separate crates better such as makepad itself -> needs a new version probably
+- i think i need some kind of display abstraction / scenegraph? or some kind of hashed list of what is painted to a view
+- general: may make sense to use more generic methods from a trait such as "paint()" rather than paint_a_thing_that_is_an_input_button()
+- textwidget: emoji?
+- textwidget: detecting carriage return -> returned events could be richer; also; why one event per call? are these stacked up?
+- textwidget: text is backwards sometimes
+- textwidget: width? -> dynamic width is a hassle
+- linking: packaging dependencies as separate crates better such as makepad itself -> needs a new version probably
 
-### TODO
+### TODO -> stories
 
-	* wasm
-		* does ask for frames
-		- shared memory would be nice
-		- asking for face scanner to do scan explicitly would be nice
-<<		- paint something useful would be nice; need to figure out how to render a texture
-		- not stopping
+	* wasm story 1;
+		* order camera to yield frames
+		* face recognizer automatically segment faces
+		- real camera, get real frames
+		- real face segmenter (maybe skip this)
+		- figure out how to pass an image to display
+		- wasm blob not stop
 
-	- try a second wasm blob
-		- add a bunch of cubes to the display
+	* wasm story 2
+		* just paint some cubes
+		x later a weather app? a navigation app? friend finder? try focus on apps for groups not for individuals
 
-
-	- display ux: show a list of apps on the side; need to interogate broker or somehow listen to traffic?
-		- need to be able to switch between apps
-
+	- display story
+		* let users actually load apps; input box and so on
+		* let apps order the display to paint something
+		- each app should hash or identify a handle on what it owns so display can show it or not as it wishes
+		- paint a list of apps both live and stashed on a side bar
+			- broker or somebody needs to be able to report a list of existing apps
+			- broker should actually persist apps as well; not just pretend to
+			- display needs to be able to paint a list of running apps
+			- running apps should be clickable and there should be state on them; permissions and so on
+			- also need to be able to switch between apps; give certain apps focus
 
 

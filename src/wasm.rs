@@ -49,16 +49,22 @@ fn wasm2(name: String, send: Sender<Message>,_recv:Receiver<Message>) -> Result<
     // what is a pattern for sending messages *TO* the wasm blob?
     // if it is a thread it may never return... it could poll a message queue?
     // while recv.try_recv -> add to queue that wasm blob can look at?
-
-    // TODO -> outbound traffic improve?
-    // in this test/approach there are functions that the wasm blob can call to talk to system capabilities
-    // there are no closures here
-    let callback_func = Func::wrap(&store,move || {
-        println!("wasm: got a call from wasm blob");
-        let _ = send.send(Message::Event("/camera".to_string(),"WASM->Camera: Give me a Frame".to_string()));
-        let _ = send.send(Message::Event("/display".to_string(),"WASM->Display: Show Frame".to_string()));
+    // https://livebook.manning.com/book/webassembly-in-action/chapter-6/24
+    
+    // outbound traffic testing - in this test i'm just registering a couple of methods for now
+    // TODO -> closures
+    // TODO -> think through what I'd like to export
+    let send2 = send.clone();
+    let callback_func1 = Func::wrap(&store,move || {
+        println!("wasm1: got a call from wasm blob");
+        let _ = send2.send(Message::Event("/camera".to_string(),"WASM->Camera: Give me a Frame".to_string()));
+        let _ = send2.send(Message::Event("/display".to_string(),"WASM->Display: Show Frame".to_string()));
     });
-    let imports = [callback_func.into()];
+    let callback_func2 = Func::wrap(&store,move || {
+        println!("wasm2: got a call from wasm blob");
+        let _ = send.send(Message::Event("/display".to_string(),"cube".to_string()));
+    });
+    let imports = [callback_func1.into(), callback_func2.into() ];
 
     // fire off entry point - since this has no guarantee of returning it should be a thread
     let instance = Instance::new(&store, &module, &imports)?;
