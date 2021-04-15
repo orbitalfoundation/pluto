@@ -24,12 +24,12 @@ impl Serviceable for Display {
 		    Message::Subscribe(sid,"/display".to_string())
 		).expect("Display: failed to subscribe");
 
-        // open a display
+        // open a display -> this never returns for now!!!
         let mut cx = Cx::default();
         cx.style();
-        ThreeDExampleApp::style(&mut cx);
+        OrbitalBrowserDesktopUX::style(&mut cx);
         cx.init_live_styles();
-        let mut app = ThreeDExampleApp::new(&mut cx,send,recv);
+        let mut app = OrbitalBrowserDesktopUX::new(&mut cx,send,recv);
         let mut cxafterdraw = CxAfterDraw::new(&mut cx);
         cx.event_loop( | cx, mut event | {
             if let Event::Draw = event {
@@ -46,9 +46,13 @@ impl Serviceable for Display {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // statically declared 2d layout
+// later i think the entire browser desktop "view" should be a wasm blob
+// a traditional browser has tabs, an input box and so on - this is basically the same, with a more desktop feel
+// i imagine a page for apps, and then also a command bar, and then also possibly separate tabs for separate app views
+// for now i just do the work right here - but as mentioned - later most of the work could move away from the "kernel" ... it itself is a view
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ThreeDExampleApp {
+pub struct OrbitalBrowserDesktopUX {
     desktop_window: DesktopWindow, 
     menu: Menu,
     world_view: WorldView,
@@ -58,7 +62,7 @@ pub struct ThreeDExampleApp {
     recv:Receiver<Message>,
 }
 
-impl ThreeDExampleApp {
+impl OrbitalBrowserDesktopUX {
     pub fn new(cx: &mut Cx, send: Sender<Message>, recv: Receiver<Message>) -> Self {
         Self {
             desktop_window: DesktopWindow::new(cx).with_inner_layout(Layout{
@@ -98,6 +102,11 @@ impl ThreeDExampleApp {
             match message {
                 Message::Event(topic,data) => {
                     println!("Display: Received: {} {}",topic, data);
+
+// TODO
+// i need to decide on the right level of abstraction
+// i think blobs should probably send display lists or some lower level display commands
+// for now i basically am sending super high level commands as a test
 
                     match data.as_str() {
                         "cube" => {

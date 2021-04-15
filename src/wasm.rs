@@ -1,6 +1,30 @@
+/*
+
+See also:
+
+State transport between WASM modules:
+
+https://alexene.dev/2020/08/17/webassembly-without-the-browser-part-1.html
+https://www.youtube.com/watch?v=vqBtoPJoQOE
+https://docs.wasmtime.dev/examples-rust-hello-world.html
+https://docs.wasmtime.dev/examples-rust-wasi.html
+https://docs.wasmtime.dev/examples-rust-multi-value.html
+https://hacks.mozilla.org/2019/03/standardizing-wasi-a-webassembly-system-interface/
+https://labs.imaginea.com/talk-the-nuts-and-bolts-of-webassembly/
+https://kevinhoffman.medium.com/introducing-wapc-dc9d8b0c2223
+https://github.com/wasmCloud/wascap
+https://github.com/wasmCloud
+https://www.ralphminderhoud.com/blog/rust-ffi-wrong-way/
+https://doc.rust-lang.org/nomicon/ffi.html
+https://www.youtube.com/watch?v=B8a01m8B6LU
+https://rise.cs.berkeley.edu/projects/erdos/
+https://www.w3.org/2018/12/games-workshop/slides/08-web-idl-bindings.pdf
+
+https://docs.microsoft.com/en-us/windows/mixed-reality/mrtk-unity/features/ux-building-blocks/app-bar
+
+*/
 
 use crossbeam::channel::*;
-use wasmtime::*;
 use std::error::Error;
 use std::fmt;
 
@@ -38,41 +62,56 @@ impl Serviceable for Wasm {
 	}
 }
 
-fn wasm2(name: String, send: Sender<Message>,_recv:Receiver<Message>) -> Result<(), Box<dyn Error>> {
 
-    let store = Store::default();
 
-    println!("Wasm: fetching url {}",name);
-    let module = Module::from_file(store.engine(), name)?;
+use wasmtime::*;
+use anyhow::Result;
+//use wasmtime_wasi::{sync::WasiCtxBuilder, Wasi};
 
-    // TODO -> inbound traffic - write support for
-    // what is a pattern for sending messages *TO* the wasm blob?
-    // if it is a thread it may never return... it could poll a message queue?
-    // while recv.try_recv -> add to queue that wasm blob can look at?
-    // https://livebook.manning.com/book/webassembly-in-action/chapter-6/24
-    
-    // outbound traffic testing - in this test i'm just registering a couple of methods for now
-    // TODO -> closures
-    // TODO -> think through what I'd like to export
-    let send2 = send.clone();
-    let callback_func1 = Func::wrap(&store,move || {
-        println!("wasm1: got a call from wasm blob");
-        let _ = send2.send(Message::Event("/camera".to_string(),"WASM->Camera: Give me a Frame".to_string()));
-        let _ = send2.send(Message::Event("/display".to_string(),"WASM->Display: Show Frame".to_string()));
+/*
+
+    //let send2 = send.clone();
+    let func1 = Func::wrap(&store,move || {
+        println!("callback1");
+        //let _ = send2.send(Message::Event("/camera".to_string(),"WASM->Camera: Give me a Frame".to_string()));
+        //let _ = send2.send(Message::Event("/display".to_string(),"WASM->Display: Show Frame".to_string()));
+        //let _ = send.send(Message::Event("/display".to_string(),"cube".to_string()));
     });
-    let callback_func2 = Func::wrap(&store,move || {
-        println!("wasm2: got a call from wasm blob");
-        let _ = send.send(Message::Event("/display".to_string(),"cube".to_string()));
+*/
+
+fn wasm2(name: String, _send: Sender<Message>,_recv:Receiver<Message>) -> Result<(), Box<dyn Error>> {
+
+    println!("Initializing...");
+    let engine = Engine::default();
+    let store = Store::new(&engine);
+
+    // Compile.
+    println!("Compiling module...");
+    let module = Module::from_file(&engine,name)?;
+
+    // Create external print functions.
+    println!("Creating callback...");
+    let drawcube_type = FuncType::new([ValType::I32, ValType::I32].iter().cloned(),[].iter().cloned());
+    let drawcube_func = Func::new(&store, drawcube_type, |_, args, _results| {
+        println!("Calling back...");
+        println!("... {} {}", args[0].unwrap_i32(), args[1].unwrap_i32());
+        Ok(())
     });
-    let imports = [callback_func1.into(), callback_func2.into() ];
 
-    // fire off entry point - since this has no guarantee of returning it should be a thread
-    let instance = Instance::new(&store, &module, &imports)?;
-    let startup = instance.get_typed_func::<(),()>("startup")?;
-    startup.call(())?;
+    // Instantiate.
+    println!("Instantiating module...");
+    let instance = Instance::new(&store, &module, &[drawcube_func.into()])?;
 
-    println!("wasm: done test");
-    // TODO think about not ending
+    // Extract exports.
+    println!("Extracting export...");
+    let run = instance.get_typed_func::<(), ()>("run")?;
+
+    // Call `$g`.
+    println!("Calling run");
+    run.call(())?;
+
+    println!("Printing result...");
+
 
     Ok(())
 }

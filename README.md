@@ -1,22 +1,32 @@
-# Prototype
+# Prototype R4
+
+## USAGE
+
+cargo run -p pluto
+this will bring up a display
+then you should manually type in the name of the wasm blob you want to run... and then hit the "go" button
+i have built a couple of test apps that are wasm blobs, they start firing off events to drive the system
+	friendfinder.wat -> the idea here is eventually it is a video camera face segmenter as a test
+	cubes.wasm -> just draw a pile of cubes
+
+* right now i just treat each wasm blob as basically what would be the equivalent of a much richer "package" describing a persistent app
+	apps will exist partially on the client and may have assets and stuff all over the net... so the initial blob is kinda a manifest of what to do
 
 ## What is this?
 
-This is a rough cut throwaway sketch of a userland web-app-runner. It is exploring an idea of running wasm based applications that are fetched over the wire. Conceptually it could be considered similar to a Desktop or Steam or any kind of modern app manager.
-
-This is intended to act like a new kind of web browser in that users can visit URLS, load and show the contents of that URL and generally have a similar kind of experience conceptually to the traditional web.
-
-The difference is that this browser also acts a bit more like Steam, or an App Store in that it's focused around an idea of downloading persistent or durable applications that it then helps the user manage. In fact the core system doesn't even natively support HTML layout at all. The plan is to only support WASM blobs and nothing else. There is an expectation that applications will be able to have a list of dependencies on other WASM modules; not dissimilar from ordinary package managers that we're used to such as NPM, Crates or WAPM.
+This is a rough cut throwaway sketch of a userland web-app-runner. It is exploring an idea of running wasm based applications that are fetched over the wire. Conceptually it could be considered similar to a Desktop or Steam or any kind of modern app manager. It loads apps (wasm blobs), runs them (pre-emptive multithreading), allows messaging between them (crossbeam). It's focused around an idea of downloading persistent or durable applications that it then helps the user manage. Eventually blobs will be able to have a list of dependencies on other blobs; not dissimilar from ordinary package managers that we're used to such as NPM, Crates or WAPM.
 
 This is all super early, the code is rough, very fragile, missing key features. It's not usable for any kind of real world purpose yet. It's purely a design-in-code sketch at the moment. The plan is to keep iterating on this core however.
 
-## What are we specifically exercising in this prototype?
+## Stories
 
-### Product Core:
+I'm finding it useful to think of this project as a series of "stories" that exercise ideas in code. There's a way of thinking about development called "agile development" that uses these terms - see: https://www.atlassian.com/agile/project-management/epics-stories-themes .
 
-Some thought has been putt into a concept of structuring units-of-computation as a set of peers in a microkernel or microservice architecture. There are these pieces in the core implementation:
+### Microservices story
 
-1. Services. There is a concept of a 'service'. A service is a self contained 'unit of computation'. There are formally two kinds of services:
+There's an idea of "units of computation" that can be dynamically fetched over the wire and that can run in a "computational soup"; or effectively a microservices / microkernel architecture. These computational units can respond to events that can be local (user input) or listen to other traffic as well. In this respect it's aspirationally similar to Fastly Lucet. This is broken into these pieces:
+
+1. Service. A service is a wasm blob that defines a unit of computation. I use the term "blob" "wasm blob" "module" or "unit of computation" interchangeably. The goal of this product is to ship behavior, not just static layouts or a DSL. There are two flavors of execution:
 
 	Rust Services : There are built-in or hard-coded services which implement raw/unsafe access to devices (camera inputs, display outputs).
 	WASM Services : WASM services load up a WASM blob from any remote source, on the fly, at runtime. These are "user apps".
@@ -27,7 +37,13 @@ Some thought has been putt into a concept of structuring units-of-computation as
 
 4. Broker. Right now there is a special discovery service that brokers messages. It implements only pub sub for now (no shared memory messages yet).
 
-### Display Service Specifically:
+### Display Hardware Access Story:
+
+It turns out that display support is special. It's so important, and pushes the capabilities of inter-blob communication. A typical app will want to drive hundreds or thousands of display elements at 120fps. What's the right abstraction to not saturate extremely-low-bandwidth inter-module communication channels? Historically rendering libraries (wgpu, opengl) directly bind to apps, allowing them to build display lists or describe shaders and so on - and then effectively allow apps to throw those descriptions over the wall into the GPU itself. This pattern of a high performance expression of work, where computation itself is thrown over the wall, is not only a good pattern for displays but shows a way forward for inter-module communication in general.
+
+### Display Hypervisor Story:
+
+There's a piece of the user display that applications CANNOT overwrite. For immersive 3d apps it's important to 
 
 Although display is not "core" it is so important that also some thought has been put into this as well:
 
@@ -69,6 +85,11 @@ There's some insight we've had already, and here are some of the areas for impro
 - linking: packaging dependencies as separate crates better such as makepad itself -> needs a new version probably
 
 ### TODO -> stories
+
+	* high performance display access story
+		- effectively wasm modules should be directly referring to a display list builder pattern
+		- they build small pieces of gpu tech, and that gets hoisted over the wall into gpu land
+		- in a way it is kind of like a scenegraph, in that there are handles on concepts, but pieces are computational not declarative
 
 	* wasm story 1;
 		* order camera to yield frames

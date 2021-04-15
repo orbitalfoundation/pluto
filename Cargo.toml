@@ -1,15 +1,28 @@
 [package]
 name = "pluto"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["anselm"]
 edition = "2018"
 
 [dependencies]
+
+# these are for the av test - move later
+
+objc = "*"
+cocoa = "*"
+libc = "*"
+dispatch = "*"
+core-foundation = "*"
+
+# these are for the kernel in general
+
 rand = "0.8.3"
 crossbeam = "0.8.0"
 wasmtime = "0.25.0"
+anyhow = "*"
 
-# appbroker = { path = "../appbroker" }
+
+# these are for some various visualization library tests
 
 # bitflags = "1.2.0"
 # libc = "0.2.90"
@@ -38,8 +51,11 @@ wasmtime = "0.25.0"
 # conrod_example_shared = "*"
 # find_folder = "*"
 
+# these pull in capabilities from makepad - eventually this will be inverted to pull in makepad as a crate
+
 [dependencies.makepad-render]
 path="../render"
 
 [dependencies.makepad-widget]
 path="../widget"
+
