@@ -224,7 +224,7 @@ pub fn startav() {
         NSLog(NSString::alloc(nil).init_str("Capture is %@"),capture);
         // The goal is to mimic this piece of objective-c code: [output setSampleBufferDelegate: capture queue: dispatch_get_main_queue()];
 // NOTE -> I can pass a nil object - it makes no diff to what happens.... or i can pass say "input" or any other random object and has no impact -> tells me the delegate is not being invoked 
-        let _: () = msg_send![output, setSampleBufferDelegate:input queue:queue];
+        let _: () = msg_send![output, setSampleBufferDelegate:capture queue:queue];
  */
 
 avtest(device,input,output);
