@@ -10,6 +10,53 @@
 
 #include "avtest.h"
 
+
+
+
+
+
+
+
+
+
+ #import <objc/runtime.h>
+
+/**
+ *  Gets a list of all methods on a class (or metaclass)
+ *  and dumps some properties of each
+ *
+ *  @param clz the class or metaclass to investigate
+ */
+void DumpObjcMethods(Class clz) {
+
+    unsigned int methodCount = 0;
+    Method *methods = class_copyMethodList(clz, &methodCount);
+
+    printf("Found %d methods on '%s'\n", methodCount, class_getName(clz));
+
+    for (unsigned int i = 0; i < methodCount; i++) {
+        Method method = methods[i];
+
+        printf("\t'%s' has method named '%s' of encoding '%s'\n",
+               class_getName(clz),
+               sel_getName(method_getName(method)),
+               method_getTypeEncoding(method));
+
+        /**
+         *  Or do whatever you need here...
+         */
+    }
+
+    free(methods);
+}
+
+
+
+
+
+
+
+
 @interface Capture : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
 @property (weak) AVCaptureSession* session;
 - (void) captureOutput: (AVCaptureOutput*) output
@@ -107,16 +154,14 @@ Capture* capture;
 //AVCaptureDevice* device;
 //AVCaptureDeviceInput* input;
 //AVCaptureVideoDataOutput* output;
-AVCaptureSession* session;
+//AVCaptureSession* session;
 
-void avtest(void* _device, void* _input, void* _output)
+void avtest(void* _capture, void* _queue, void* _output)
 {
 
   //AVCaptureDevice* device = (__bridge AVCaptureDevice*)_device;
   //AVCaptureDeviceInput* input = (__bridge AVCaptureDeviceInput*)_input;
   AVCaptureVideoDataOutput* output = (__bridge AVCaptureVideoDataOutput*)_output;
-
-  NSLog(@"AVTest.m starting...");
 
   //just for fun
   //NSArray *captureDeviceType = @[AVCaptureDeviceTypeBuiltInWideAngleCamera];
@@ -141,14 +186,21 @@ void avtest(void* _device, void* _input, void* _output)
   [output setSampleBufferDelegate: capture queue: dispatch_get_main_queue()];
   NSLog(@"AVTest: Attached capture handler to output");
   
+
+
+id mycapture2 = [[NSClassFromString(@"MyCapture") alloc] init];
+NSLog(@"Got instance of myclass %@",mycapture2);
+
+DumpObjcMethods(NSClassFromString(@"MyCapture"));
+DumpObjcMethods(NSClassFromString(@"Capture"));
+
+
   //session = [[AVCaptureSession alloc] init];
   //[session addInput: input];
   //[session addOutput: output];
   
   //capture.session = session;
   //[session startRunning];
-
-  NSLog(@"Started");
 
   //CFShow(buffer);   
   //CFTypeID blah = CFGetTypeID(buffer);

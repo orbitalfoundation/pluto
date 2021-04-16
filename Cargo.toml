@@ -1,33 +1,48 @@
+
+##########################################################################################
 [package]
 name = "pluto"
 version = "0.2.0"
 authors = ["anselm"]
 edition = "2018"
 
-[build-dependencies]
-cc = "*"
-bindgen = "*"
+##########################################################################################
+# [build-dependencies]
+# cc = "*"
+# bindgen = "*"
 
+
+##########################################################################################
 [dependencies]
 
-# these are for the av test - move later
-
-objc = "*"
-cocoa = "*"
-libc = "*"
-dispatch = "*"
-core-foundation = "*"
-# coremedia-sys = "*"
-
 # these are for the kernel in general
-
 rand = "0.8.3"
 crossbeam = "0.8.0"
 wasmtime = "0.25.0"
 anyhow = "*"
 
+##########################################################################################
+# these are for camera.rs av test - move to separate package as that matures
+objc = "*"
+cocoa = "*"
+dispatch = "*"
+# libc = "*"
+# core-foundation = "*"
+# coremedia-sys = "*"
 
-# these are for some various visualization library tests
+##########################################################################################
+# these pull in capabilities from makepad - see display.rs
+# eventually this will be inverted to pull in makepad as a crate
+
+[dependencies.makepad-render]
+path="../render"
+
+[dependencies.makepad-widget]
+path="../widget"
+
+
+##########################################################################################
+# these are for some other visualization library tests - see display.rs - unused
 
 # bitflags = "1.2.0"
 # libc = "0.2.90"
@@ -56,11 +71,4 @@ anyhow = "*"
 # conrod_example_shared = "*"
 # find_folder = "*"
 
-# these pull in capabilities from makepad - eventually this will be inverted to pull in makepad as a crate
-
-[dependencies.makepad-render]
-path="../render"
-
-[dependencies.makepad-widget]
-path="../widget"
-
+#

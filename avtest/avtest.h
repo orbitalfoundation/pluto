@@ -10,4 +10,4 @@ void avtest(AVCaptureDevice* device, AVCaptureDeviceInput* input, AVCaptureVideo
 */
 
 
-void avtest(void* device, void* input, void* output);
+void avtest(void* _capture, void* _queue, void* _output);
