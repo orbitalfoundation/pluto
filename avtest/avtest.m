@@ -8,6 +8,8 @@
 #import <AVFoundation/AVFoundation.h>
 #import <AppKit/AppKit.h>
 
+#include "avtest.h"
+
 @interface Capture : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
 @property (weak) AVCaptureSession* session;
 - (void) captureOutput: (AVCaptureOutput*) output
@@ -99,7 +101,8 @@ int quit(NSError * error) {
   return 1;
 }
 
-void avtest() {
+void avtest(AVCaptureDevice* xdevice, AVCaptureDeviceInput* xinput, AVCaptureVideoDataOutput* xoutput)
+{
 
   NSLog(@"AVTest.m starting...");
 

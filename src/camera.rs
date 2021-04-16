@@ -45,14 +45,23 @@ notably
 //#![allow(non_snake_case)]
 //include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-//include!("avtest/avtest.rs");
-
-//#[link_args = "./avtest/libavtest.a"]
 
 #[link(name = "avtest")]
+
+// this fails.... so bindgen is not being used for now
+include!("../avtest/avtestbind.in");
+
+
+/*
+// i cut and paste the contents of avtestbind.rs here and it no longer fails! sigh
 extern "C" {
-    fn avtest();
+    pub fn avtest(
+        device: AVCaptureDevice,
+        input: AVCaptureDeviceInput,
+        output: AVCaptureVideoDataOutput,
+    );
 }
+*/
 
 // ----------------------------------------------------------------------------------------------------
 // get a few things
@@ -117,12 +126,6 @@ extern {
 /// setup a camera and try start capturing frames
 pub fn startav() {
 
-
-    unsafe {
-        avtest();
-    }
-
-/*
     unsafe {
 
         // make secret enum type "vide" - not really documented anywhere but i did find a C# citation of this in a random reddit post...
@@ -142,7 +145,9 @@ pub fn startav() {
         //let _: () = msg_send![output,alwaysDiscardsLateVideoFrames:YES];
         //let _: () = msg_send![output,setEnabled:YES]; [[output connectionWithMediaType:AVMediaTypeVideo] setEnabled:YES];
 
+avtest(device,input,output);
 
+/*
         // MAKE A DISPATCHER
         // This returns me a " OS_dispatch_queue_main: com.apple.main-thread "
         // https://developer.apple.com/documentation/dispatch/os_dispatch_queue_main
@@ -241,9 +246,8 @@ pub fn startav() {
 
         // maybe this?
 
-
+*/
    }
-    */
 
     println!("running");
     unsafe { core_foundation::runloop::CFRunLoopRun(); }

@@ -12,13 +12,25 @@ fn main() {
 	// I could try this for avfoundation
 	// https://simlay.net/posts/rust-bindgen-objc-support/
 
+// https://github.com/simlay/uikit-sys/blob/master/build.rs
+//    let mut clang_args = vec!["-x", "objective-c", "-fblocks", &target_arg];
+//    if let Some(sdk_path) = sdk_path {
+//        clang_args.extend(&["-isysroot", sdk_path]);
+//    }
 
+//let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS13.6.sdk";
+
+//let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AVFoundation.framework";
+
+let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+
+// /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AVFoundation.framework/Versions/A/Headers/AVFoundation.h
 
     let builder = bindgen::Builder::default()
         .rustfmt_bindings(true)
         .header("avtest/avtest.h")
 //        .clang_args(&[&format!("--target={}", target)])
-//        .clang_args(&["-isysroot", sdk_path])
+        .clang_args(&["-isysroot", sdk_path])
         .block_extern_crate(true)
         .generate_block(true)
         .clang_args(&["-fblocks"])
@@ -33,7 +45,7 @@ fn main() {
     let bindings = builder.generate().expect("unable to generate bindings");
 
     bindings
-        .write_to_file("avtest/avtestbind.rs")
+        .write_to_file("avtest/avtestbind.in")
         .expect("could not write bindings");
 
 /*
