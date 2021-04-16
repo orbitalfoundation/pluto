@@ -101,46 +101,54 @@ int quit(NSError * error) {
   return 1;
 }
 
-void avtest(AVCaptureDevice* xdevice, AVCaptureDeviceInput* xinput, AVCaptureVideoDataOutput* xoutput)
+// HACK - make global to prevent from being deallocated when they leave scope
+// later turn into some kind of class or utility widget
+Capture* capture;
+//AVCaptureDevice* device;
+//AVCaptureDeviceInput* input;
+//AVCaptureVideoDataOutput* output;
+AVCaptureSession* session;
+
+void avtest(void* _device, void* _input, void* _output)
 {
+
+  //AVCaptureDevice* device = (__bridge AVCaptureDevice*)_device;
+  //AVCaptureDeviceInput* input = (__bridge AVCaptureDeviceInput*)_input;
+  AVCaptureVideoDataOutput* output = (__bridge AVCaptureVideoDataOutput*)_output;
 
   NSLog(@"AVTest.m starting...");
 
-  NSError* error = nil;
-  Capture* capture = [[Capture alloc] init];
-  
-  NSArray *captureDeviceType = @[AVCaptureDeviceTypeBuiltInWideAngleCamera];
+  //just for fun
+  //NSArray *captureDeviceType = @[AVCaptureDeviceTypeBuiltInWideAngleCamera];
+  //AVCaptureDeviceDiscoverySession *captureDevice =
+  //    [AVCaptureDeviceDiscoverySession
+  //      discoverySessionWithDeviceTypes:captureDeviceType
+  //      mediaType:AVMediaTypeVideo
+  //      position:AVCaptureDevicePositionUnspecified
+  //      ];
+  //for(id object in captureDevice.devices) { NSLog(@"all devices %@",object); }
 
-  AVCaptureDeviceDiscoverySession *captureDevice =
-      [AVCaptureDeviceDiscoverySession
-        discoverySessionWithDeviceTypes:captureDeviceType
-        mediaType:AVMediaTypeVideo
-        position:AVCaptureDevicePositionUnspecified
-        ];
+  //device = [AVCaptureDevice defaultDeviceWithMediaType: AVMediaTypeVideo];
+  //NSLog(@"Got Device %@",device);
+  //CFShow(CFBridgingRetain(device));
 
-  for(id object in captureDevice.devices) {
-      NSLog(@"all devices %@",object);
-  }
+  //NSError* error = nil;
+  //input = [AVCaptureDeviceInput deviceInputWithDevice: device  error: &error];
+  //NSLog(@"Got Input");
 
-  AVCaptureDevice* device = [AVCaptureDevice defaultDeviceWithMediaType: AVMediaTypeVideo];
-  NSLog(@"Got Device");
-
-  AVCaptureDeviceInput* input = [AVCaptureDeviceInput deviceInputWithDevice: device  error: &error];
-  NSLog(@"Got Input");
-
-  AVCaptureVideoDataOutput* output = [[AVCaptureVideoDataOutput alloc] init];
+  //output = [[AVCaptureVideoDataOutput alloc] init];
+  capture = [[Capture alloc] init];
   [output setSampleBufferDelegate: capture queue: dispatch_get_main_queue()];
-  NSLog(@"Got Output");
+  NSLog(@"AVTest: Attached capture handler to output");
   
-  AVCaptureSession* session = [[AVCaptureSession alloc] init];
-  [session addInput: input];
-  [session addOutput: output];
+  //session = [[AVCaptureSession alloc] init];
+  //[session addInput: input];
+  //[session addOutput: output];
   
-  capture.session = session;
-  [session startRunning];
+  //capture.session = session;
+  //[session startRunning];
 
   NSLog(@"Started");
-  CFRunLoopRun();
 
   //CFShow(buffer);   
   //CFTypeID blah = CFGetTypeID(buffer);

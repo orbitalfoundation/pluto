@@ -48,8 +48,8 @@ notably
 
 #[link(name = "avtest")]
 
-// this fails.... so bindgen is not being used for now
-include!("../avtest/avtestbind.in");
+// this just gets too overwhelming - i don't want to debug and fix a ton of header stuff
+//include!("../avtest/avtestbind.in");
 
 
 /*
@@ -62,6 +62,14 @@ extern "C" {
     );
 }
 */
+
+extern "C" {
+    pub fn avtest(
+        device: *mut Object,
+        input: *mut Object,
+        output: *mut Object,
+    );
+}
 
 // ----------------------------------------------------------------------------------------------------
 // get a few things
@@ -145,8 +153,6 @@ pub fn startav() {
         //let _: () = msg_send![output,alwaysDiscardsLateVideoFrames:YES];
         //let _: () = msg_send![output,setEnabled:YES]; [[output connectionWithMediaType:AVMediaTypeVideo] setEnabled:YES];
 
-avtest(device,input,output);
-
 /*
         // MAKE A DISPATCHER
         // This returns me a " OS_dispatch_queue_main: com.apple.main-thread "
@@ -219,6 +225,10 @@ avtest(device,input,output);
         // The goal is to mimic this piece of objective-c code: [output setSampleBufferDelegate: capture queue: dispatch_get_main_queue()];
 // NOTE -> I can pass a nil object - it makes no diff to what happens.... or i can pass say "input" or any other random object and has no impact -> tells me the delegate is not being invoked 
         let _: () = msg_send![output, setSampleBufferDelegate:input queue:queue];
+ */
+
+avtest(device,input,output);
+
 
         // MAKE SESSION AND START IT
 
@@ -244,13 +254,12 @@ avtest(device,input,output);
         //app.setActivationPolicy_(NSApplicationActivationPolicyRegular);
         //app.run();
 
-        // maybe this?
+        // this does not work... if i let things fall through to makepad we are fine however
+        //unsafe { core_foundation::runloop::CFRunLoopRun(); }
 
-*/
    }
 
-    println!("running");
-    unsafe { core_foundation::runloop::CFRunLoopRun(); }
+    println!("falling out to the rest of the system");
 
 }
 

@@ -3,28 +3,22 @@ extern crate cc;
 
 fn main() {
 
-    println!(r"cargo:rustc-link-search=/Users/anselm/orbital/makepad/pluto/avtest");
-
+    // AVFoundation is needed - can be done here or could be pulled in right from rust source
     println!("cargo:rustc-link-lib=framework=AVFoundation");
 
-    println!("cargo:rerun-if-changed=avtest/avcapture.h");
+    // force link in libavtest.a by providing library path
+    println!(r"cargo:rustc-link-search=/Users/anselm/orbital/makepad/pluto/avtest");
 
-	// I could try this for avfoundation
+    // ...
+    println!("cargo:rerun-if-changed=avtest/avtest.h");
+
+/*
+    // Use this approach to generate avfoundation headers
+    // turned off for now....
+
 	// https://simlay.net/posts/rust-bindgen-objc-support/
 
-// https://github.com/simlay/uikit-sys/blob/master/build.rs
-//    let mut clang_args = vec!["-x", "objective-c", "-fblocks", &target_arg];
-//    if let Some(sdk_path) = sdk_path {
-//        clang_args.extend(&["-isysroot", sdk_path]);
-//    }
-
-//let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS13.6.sdk";
-
-//let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AVFoundation.framework";
-
-let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
-
-// /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AVFoundation.framework/Versions/A/Headers/AVFoundation.h
+    let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
 
     let builder = bindgen::Builder::default()
         .rustfmt_bindings(true)
@@ -41,14 +35,17 @@ let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.plat
         .blacklist_function("dividerImageForLeftSegmentState_rightSegmentState_")
         .blacklist_item("objc_object");
 
-
     let bindings = builder.generate().expect("unable to generate bindings");
 
     bindings
         .write_to_file("avtest/avtestbind.in")
         .expect("could not write bindings");
+*/
 
 /*
+    // Generate simpler bindings for a bare bones headers without pulling in all of avfoundation
+    // Also turned off for now ... I just build these by hand
+
     // For C++ This is generating bindings that do not work...so the source is declaring them again as well
     let bindings = bindgen::Builder::default()
         .header("avtest/avtest.h")
@@ -63,11 +60,14 @@ let sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.plat
 */
 
 
-/* This works for C++ but not for objective c - so i build by hand for now
+/*
+
+    // This works for C++ but not for objective c - so i build by hand for now also...
+    // goto the avtest folder and run ./make by hand to build libavtest.a
 
     cc::Build::new()
 		.file("avtest/avtest.m")
-		.compile("libavcapture.a");
+		.compile("libavtest.a");
 */
 
 }
