@@ -1,0 +1,4 @@
+clang -c -fobjc-arc -Wall -Wextra -pedantic avtest.m  -framework Cocoa -framework AVFoundation -framework CoreMedia -framework QuartzCore -o avtest.o
+
+ar rc libavtest.a avtest.o
+

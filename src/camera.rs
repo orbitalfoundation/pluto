@@ -11,6 +11,26 @@ Also here is a bit of rust code that shows working with rust-objc messaging and 
     https://kyle.space/posts/cocoa-apps-in-rust-eventually/
     (Makepad itself also has good examples)
 
+rust-media invents the idea of a core media buffer (although this code is quite old):
+
+    https://github.com/pcwalton/rust-media/blob/master/platform/macos/coremedia.rs
+
+this is a player that uses it
+
+    https://github.com/pcwalton/rust-media/blob/master/platform/macos/videotoolbox.rs
+
+here are some others
+
+    https://github.com/LuoZijun/rust-core-media-sys
+    https://github.com/LuoZijun/rust-core-video-sys/blob/master/src/lib.rs
+
+notably 
+
+    https://github.com/LuoZijun/rust-core-media-sys/blob/master/src/sample_buffer.rs
+
+// links:
+// some other library https://lib.rs/crates/objrs
+
 */
 
 // ----------------------------------------------------------------------------------------------------
@@ -18,11 +38,32 @@ Also here is a bit of rust code that shows working with rust-objc messaging and 
 #![allow(non_snake_case)]
 
 // ----------------------------------------------------------------------------------------------------
+// bind to some external test code
+
+//#![allow(non_upper_case_globals)]
+//#![allow(non_camel_case_types)]
+//#![allow(non_snake_case)]
+//include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+//include!("avtest/avtest.rs");
+
+//#[link_args = "./avtest/libavtest.a"]
+
+#[link(name = "avtest")]
+extern "C" {
+    fn avtest();
+}
+
+// ----------------------------------------------------------------------------------------------------
+// get a few things
+use core_foundation::base::{Boolean, CFRelease, CFRetain, CFTypeID, CFTypeRef, TCFType};
+
+// ----------------------------------------------------------------------------------------------------
 // I use AVFoundation, but I specify this in build.rs
 // #[link(name = "AVFoundation", kind = "framework")]
 
 // ----------------------------------------------------------------------------------------------------
-// Objective C helper - does most of our bridging
+// Objective C helper - does most of our bridging - does provide its own selector and sel! macros
 use objc::runtime::{Class, Object, Sel, Protocol};
 use objc::declare::ClassDecl;
 
@@ -52,20 +93,36 @@ use cocoa::foundation::NSString;
 
 // ----------------------------------------------------------------------------------------------------
 // NSLog ...
-//#[link(name = "Foundation", kind = "framework")] <- alread provided
+#[link(name = "CoreMedia", kind = "framework")]
+#[link(name = "CoreFoundation", kind = "framework")]
+#[link(name = "Foundation", kind = "framework")]
 extern { pub fn NSLog(fmt: *mut Object, ...); }
 
 // ----------------------------------------------------------------------------------------------------
-// cocoa::base
+// cocoa::base - provides a selector builder also
 //#[allow(non_upper_case_globals)]
 //type id = *mut Object;
 //const nil: id = 0 as Id;
 use cocoa::base::{SEL,selector, nil, id, NO, YES};
 
 // ----------------------------------------------------------------------------------------------------
+// get at type id - see https://github.com/pcwalton/rust-media/blob/master/platform/macos/coremedia.rs
+
+#[link(name="CoreMedia", kind="framework")]
+extern {
+    pub fn CMSampleBufferGetTypeID() -> CFTypeID;
+}
+
+// ----------------------------------------------------------------------------------------------------
 /// setup a camera and try start capturing frames
 pub fn startav() {
 
+
+    unsafe {
+        avtest();
+    }
+
+/*
     unsafe {
 
         // make secret enum type "vide" - not really documented anywhere but i did find a C# citation of this in a random reddit post...
@@ -94,21 +151,60 @@ pub fn startav() {
         NSLog(NSString::alloc(nil).init_str("queue is %@"),queue);
 
         // MAKE A CAPTURE HANDLER
+        let mut Capture = ClassDecl::new("MyCapture", class!(NSObject)).unwrap();
+
         // Throw in the protocol thing - not sure if it matters - I've heard it does not matter?
         // See protocol spec at https://developer.apple.com/documentation/avfoundation/avcapturevideodataoutputsamplebufferdelegate
         // Also see https://developer.apple.com/documentation/avfoundation/avcapturevideodataoutput/1389008-setsamplebufferdelegate
-        let mut Capture = ClassDecl::new("MyCapture", class!(NSObject)).unwrap();
-
-// NOTE -> protocol decl is ignored no diff - for example i can comment this next line out or not - makes no diff
+        // NOTE -> protocol decl is ignored no diff - for example i can comment this next line out or not - makes no diff
         Capture.add_protocol(&Protocol::get("AVCaptureVideoDataOutputSampleBufferDelegate").unwrap());
 
-        extern fn myCaptureOutput(_this: &Object, _cmd: Sel) {
+        // Build a capture output handler with the right signature
+        // This is the signature:
+        //      https://developer.apple.com/documentation/avfoundation/avcapturevideodataoutputsamplebufferdelegate
+        //
+        // Apple says it should look like this:
+        //      func captureOutput(AVCaptureOutput, didOutput: CMSampleBuffer, from: AVCaptureConnection)
+        //
+        // The objective-C implementation that does work looks like this:
+        //
+        //      - (void)       captureOutput: (AVCaptureOutput*) output
+        //             didOutputSampleBuffer: (CMSampleBufferRef) buffer
+        //                    fromConnection: (AVCaptureConnection*) connection 
+        //
+        // Apparently when you make a selector it mashes up all these fields to make a signature.... and rust_objc is just a macro around cocoas
+        //
+        //            sel!(captureOutput: didOutput: from:)
+        //
+        // ? I'm still not sure why there are colons on these ? it is idiosyncratic compared to other selectors.
+        // NOTE we can also switch to using the cocoa selector builder instead if we want - we don't have to use the one from rust_objc
+        // https://github.com/SSheldon/rust-objc/blob/master/src/macros.rs
+        //
+        // In general - what is signature production?
+        //    https://developer.apple.com/library/archive/documentation/General/Conceptual/DevPedia-CocoaCore/Selector.html
+        //
+        // So I think it will be something like "captureOutput:didOutput:from:"
+        //
+
+        //
+        // Also - separately - we may need the right signature for the class type???
+        //   https://developer.apple.com/documentation/coremedia/1489662-cmsamplebuffergettypeid
+        //   
+
+        let typeid: CFTypeID = CMSampleBufferGetTypeID();
+
+        extern fn myCaptureOutput(_this: &Object, _cmd: Sel, id1: id, id2: id, id3: id) {
             println!("stuff");
-            // is this being reached??!? is it printing???
         }
 
-// NOTE -> method name is ignored - i can call this garbageasdfasdfOutput and it won't crash or declare anything is missing at runtime...
-        Capture.add_method(sel!(captureOutput), myCaptureOutput as extern fn(&Object,Sel));
+        // paranoia check
+        let magic1 = sel!(captureOutput: didOutput: from:);
+        let magic2 = selector("captureOutput:didOutput:from:");
+        if(magic1 == magic2) { println!("they are similar as expected"); }
+
+        // NOTE -> even the wrong name here does not report an issue
+
+        Capture.add_method(magic2, myCaptureOutput as extern fn(&Object,Sel, id, id, id));
 
         Capture.register();
         let Capture = Class::get("MyCapture").unwrap(); // why can't I somehow dereference the one I built above?
@@ -116,10 +212,45 @@ pub fn startav() {
         let capture: *mut Object = msg_send![capture,init];
         NSLog(NSString::alloc(nil).init_str("Capture is %@"),capture);
         // The goal is to mimic this piece of objective-c code: [output setSampleBufferDelegate: capture queue: dispatch_get_main_queue()];
-
 // NOTE -> I can pass a nil object - it makes no diff to what happens.... or i can pass say "input" or any other random object and has no impact -> tells me the delegate is not being invoked 
-
         let _: () = msg_send![output, setSampleBufferDelegate:input queue:queue];
+
+        // MAKE SESSION AND START IT
+
+        let session: *mut Object = msg_send![class!(AVCaptureSession),alloc];
+        let session: *mut Object = msg_send![session,init];
+        let _: () = msg_send![session,addInput:input];
+        let _: () = msg_send![session,addOutput:output];
+        let _: () = msg_send![session,startRunning];
+        NSLog(NSString::alloc(nil).init_str("Session is %@"),session);
+
+        // see if anything happens
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        // DISPATCHERS???
+        // https://github.com/SSheldon/rust-dispatch/blob/master/examples/main.rs
+        // https://faq.sealedabstract.com/rust/#dispatch
+        //dispatch::ffi::dispatch_main();
+
+        // STANDALONE?
+        // TEST STANDALONE
+        //let _pool = NSAutoreleasePool::new(nil);
+        //let app = NSApp();
+        //app.setActivationPolicy_(NSApplicationActivationPolicyRegular);
+        //app.run();
+
+        // maybe this?
+
+
+   }
+    */
+
+    println!("running");
+    unsafe { core_foundation::runloop::CFRunLoopRun(); }
+
+}
+
+
 
 /*
 
@@ -150,43 +281,6 @@ didOutputSampleBuffer? -> is this useful?
 
 */
 
-
-        // MAKE SESSION AND START IT
-
-        let session: *mut Object = msg_send![class!(AVCaptureSession),alloc];
-        let session: *mut Object = msg_send![session,init];
-        let _: () = msg_send![session,addInput:input];
-        let _: () = msg_send![session,addOutput:output];
-        let _: () = msg_send![session,startRunning];
-        NSLog(NSString::alloc(nil).init_str("Session is %@"),session);
-
-        // see if anything happens
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-
-        // DISPATCHERS???
-        // https://github.com/SSheldon/rust-dispatch/blob/master/examples/main.rs
-        // https://faq.sealedabstract.com/rust/#dispatch
-        //dispatch::ffi::dispatch_main();
-
-        // STANDALONE?
-        // TEST STANDALONE
-        //let _pool = NSAutoreleasePool::new(nil);
-        //let app = NSApp();
-        //app.setActivationPolicy_(NSApplicationActivationPolicyRegular);
-        //app.run();
-
-        // maybe this?
-       // println!("running");
-        core_foundation::runloop::CFRunLoopRun();
-
-
-   }
-
-
-}
-
-// links:
-// some other library https://lib.rs/crates/objrs
 
 
 

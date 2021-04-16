@@ -4,6 +4,10 @@ version = "0.2.0"
 authors = ["anselm"]
 edition = "2018"
 
+[build-dependencies]
+cc = "*"
+bindgen = "*"
+
 [dependencies]
 
 # these are for the av test - move later
@@ -13,6 +17,7 @@ cocoa = "*"
 libc = "*"
 dispatch = "*"
 core-foundation = "*"
+# coremedia-sys = "*"
 
 # these are for the kernel in general
 
