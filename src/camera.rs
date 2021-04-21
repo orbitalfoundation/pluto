@@ -66,9 +66,10 @@ use objc::declare::ClassDecl;
 // ----------------------------------------------------------------------------------------------------
 // build.rs can specify these also... notably the app will link but will fail to run without these
 #[link(name = "AVFoundation", kind = "framework")]
-//#[link(name = "CoreMedia", kind = "framework")]
-//#[link(name = "CoreFoundation", kind = "framework")]
-//#[link(name = "Foundation", kind = "framework")]
+#[link(name = "CoreMedia", kind = "framework")]
+#[link(name = "CoreImage", kind = "framework")]
+#[link(name = "CoreFoundation", kind = "framework")]
+#[link(name = "Foundation", kind = "framework")]
 extern { pub fn NSLog(fmt: *mut Object, ...); }
 
 // ----------------------------------------------------------------------------------------------------
@@ -90,11 +91,65 @@ use cocoa::foundation::NSString;
 //#[allow(non_upper_case_globals)]
 //type id = *mut Object;
 //const nil: id = 0 as Id;
-use cocoa::base::{nil, id};
+use cocoa::base::{nil, id, NO, YES};
+
+// ----------------------------------------------------------------------------------------------------
+// trying to get at some of these methods; seems easiest to just use id
+
+/*
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct __CVBuffer {
+    _unused: [u8; 0],
+}
+pub type CVBufferRef = *mut __CVBuffer;
+pub type CVImageBufferRef = CVBufferRef;
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct opaqueCMSampleBuffer {
+    _unused: [u8; 0],
+}
+pub type CMSampleBufferRef = *mut opaqueCMSampleBuffer;
+*/
+
+extern "C" {
+    pub fn CMSampleBufferGetImageBuffer(buffer: id) -> id;
+    // pub fn CMSampleBufferGetOutputPresentationTimeStamp(buffer:id) -> id;
+    // pub fn CMTimeGetSeconds(time:id) -> f64;
+}
+
+generate_counter!(Counter, usize);
 
 // ----------------------------------------------------------------------------------------------------
 /// setup a camera and try start capturing frames
 pub fn startav() {
+
+    // CALLBACK
+    extern fn myCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, buffer: id, _id3: id) {
+        unsafe {
+
+            // this crashes
+            //let time = CMSampleBufferGetOutputPresentationTimeStamp(buffer);
+            //let time = CMTimeGetSeconds(time);
+            //println!("Time is {}",time);
+
+            let frame = CMSampleBufferGetImageBuffer(buffer);
+            let image: *mut Object = msg_send![class!(CIImage), imageWithCVImageBuffer: frame];
+            let bitmap: *mut Object = msg_send![class!(NSBitmapImageRep), alloc];
+            let _: () = msg_send![bitmap,initWithCIImage: image];
+
+// -> now i want to pipe frames to makepads renderer...
+
+            // build a png
+            if false {
+                let filename = format!("result{}.png",Counter::next() );
+                let filename = NSString::alloc(nil).init_str(filename.as_str());
+                let data: *mut Object = msg_send![bitmap, representationUsingType:4 properties: nil];
+                let _: () = msg_send![data, writeToFile: filename atomically: YES];
+            }
+        }
+    }
 
     unsafe {
 
@@ -116,13 +171,6 @@ pub fn startav() {
         // MAKE A DISPATCHER
         let queue = dispatch::ffi::dispatch_get_main_queue();
         NSLog(NSString::alloc(nil).init_str("queue is %@"),queue);
-
-        // MAKE CALLBACK
-        extern fn myCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, _id2: id, _id3: id) {
-            // https://developer.apple.com/documentation/coremedia/1489662-cmsamplebuffergettypeid
-            // let typeid: CFTypeID = CMSampleBufferGetTypeID();
-            println!("stuff");
-        }
 
         // MAKE A CAPTURE HANDLER
         let mut Capture = ClassDecl::new("MyCapture", class!(NSObject)).unwrap();
@@ -162,61 +210,61 @@ use crate::kernel::*;
 #[derive(Clone)]
 pub struct Camera {}
 impl Camera {
-	pub fn new() -> Box<dyn Serviceable> {
-		Box::new(Self {})
-	}
+    pub fn new() -> Box<dyn Serviceable> {
+        Box::new(Self {})
+    }
 }
 impl Serviceable for Camera {
     fn name(&self) -> &str { "Camera" }
-	fn stop(&self) {}
-	fn start(&self, _name: String, _sid: SID, send: Sender<Message>, recv: Receiver<Message> ) {
-		let send = send.clone();
-		let recv = recv.clone();
-		let name = self.name();
+    fn stop(&self) {}
+    fn start(&self, _name: String, _sid: SID, send: Sender<Message>, recv: Receiver<Message> ) {
+        let send = send.clone();
+        let recv = recv.clone();
+        let name = self.name();
 
 // hard start video capture as a test
 startav();
 
-		let _thread = std::thread::Builder::new().name(name.to_string()).spawn(move || {
+        let _thread = std::thread::Builder::new().name(name.to_string()).spawn(move || {
 
-			// for now wait for an order to deliver a frame
-		    send.send(Message::Subscribe(_sid,"/camera".to_string())).expect("Camera: failed to subscribe");
+            // for now wait for an order to deliver a frame
+            send.send(Message::Subscribe(_sid,"/camera".to_string())).expect("Camera: failed to subscribe");
 
-		    // emit a frame on command only
-		    // obviously this is all pretend - no real frame is sent here
-		    // TODO send back to caller only
-		    // TODO use a shared memory buffer pattern
-		    // TODO can start sending until ordered to stop
-	        while let Ok(message) = recv.recv() {
-			    match message {
-			    	Message::Event(topic,data) => {
-			    		println!("Camera: Received: {} {}",topic, data);
-			    		let message = Message::Event("/frames".to_string(),"[A FRAME OF VIDEO]".to_string());
-						send.send(message).expect("error");
-			    	},
-			        _ => { },
-			    }
-	        }
+            // emit a frame on command only
+            // obviously this is all pretend - no real frame is sent here
+            // TODO send back to caller only
+            // TODO use a shared memory buffer pattern
+            // TODO can start sending until ordered to stop
+            while let Ok(message) = recv.recv() {
+                match message {
+                    Message::Event(topic,data) => {
+                        println!("Camera: Received: {} {}",topic, data);
+                        let message = Message::Event("/frames".to_string(),"[A FRAME OF VIDEO]".to_string());
+                        send.send(message).expect("error");
+                    },
+                    _ => { },
+                }
+            }
 
-		    /* not used - in this pattern frames were proactively published; in this test I was use using the command line to fetch real frames
-			loop {
-			    std::thread::sleep(std::time::Duration::from_millis(1000));
-		        while let Ok(message) = recv.try_recv() {
-				    match message {
-				        _ => { },
-				    }
-		        }
+            /* not used - in this pattern frames were proactively published; in this test I was use using the command line to fetch real frames
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+                while let Ok(message) = recv.try_recv() {
+                    match message {
+                        _ => { },
+                    }
+                }
 
-			    let _results = app_videocapture2();
+                let _results = app_videocapture2();
 
-				send.send(
-					Message::Event("/frames".to_string(),"AMAZING!".to_string())
-				).expect("send.send() failed!");
+                send.send(
+                    Message::Event("/frames".to_string(),"AMAZING!".to_string())
+                ).expect("send.send() failed!");
 
-			}
-			*/
-		});
-	}
+            }
+            */
+        });
+    }
 }
 
 
@@ -249,26 +297,6 @@ fn app_videocapture2() -> Result<(), std::io::Error> {
 }
 
 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

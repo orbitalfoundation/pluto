@@ -5,7 +5,6 @@ use crate::kernel::*;
 use makepad_render::*;
 use makepad_widget::*;
 
-
 #[derive(Clone)]
 pub struct Display {
 }
@@ -161,6 +160,13 @@ impl OrbitalBrowserDesktopUX {
         self.desktop_window.end_desktop_window(cx);
     }
 }
+
+
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 3d immediate mode
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,13 +187,15 @@ pub struct WorldView {
     pub time: f64,
     pub sky_box: SkyBox,
     pub cube: DrawCube,
-//    pub image: DrawImage,
+    pub image: DrawImage,
     pub viewport_3d: Viewport3D,
     pub next_frame: NextFrame,
     pub scene: Vec<SceneThing>,
+    pub mytex: usize,
 }
 
 impl WorldView {
+
     pub fn new(cx: &mut Cx) -> Self {
         Self {
             view: View::new(),
@@ -196,8 +204,9 @@ impl WorldView {
             next_frame: NextFrame::default(),
             sky_box: SkyBox::new(cx),
             cube: DrawCube::new(cx, default_shader!()),
+            image: DrawImage::new(cx, default_shader!()),
             scene: Vec::new(),
-        //    image: DrawImage::new(cx, default_shader!()),
+            mytex: 0, //make_texture(),
         }
     }
     
@@ -231,6 +240,44 @@ impl WorldView {
         // lets draw it
         self.viewport_3d.draw_viewport_2d(cx);
     }
+
+
+
+    pub fn make_texture(&mut self, cx: &mut Cx) ->usize {
+
+        if self.mytex == 0 {
+
+            let pixels: Vec<u32> = vec![
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+            ];
+
+            let texture = CxTexture {
+                desc: TextureDesc {
+                    format: TextureFormat::ImageBGRA,
+                    width: Some(8),
+                    height: Some(8),
+                    multisample: None
+                },
+                image_u32: pixels,
+                image_f32: Vec::new(),
+                update_image: true,
+                platform: CxPlatformTexture::default()
+            };
+
+            self.mytex = cx.textures.len();
+            cx.textures.push(texture);
+            println!("cx textures has len={}",self.mytex);
+        }
+
+        self.mytex
+    }
     
     pub fn draw_world_view_3d(&mut self, cx: &mut Cx) {
 
@@ -241,7 +288,81 @@ impl WorldView {
         self.view.lock_view_transform(cx, &Mat4::identity());
         
         self.sky_box.draw_sky_box(cx);
-        
+
+// get image
+//let mut image = DrawImage::new(cx, default_shader!());
+
+let Texture2D(fuckingtuples) = self.image.texture;
+match fuckingtuples {
+    None => {
+
+            // some pixels
+            let pixels: Vec<u32> = vec![
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+            ];
+
+            // some pixels
+            let pixels2: Vec<u32> = vec![
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
+            ];
+
+            // Populate a cx texture from scratch, stuff it into cx.textures and DrawImage
+            if false {
+                let texture = CxTexture {
+                    desc: TextureDesc {
+                        format: TextureFormat::ImageBGRA,
+                        width: Some(8),
+                        height: Some(8),
+                        multisample: None
+                    },
+                    image_u32: pixels,
+                    image_f32: Vec::new(),
+                    update_image: true,
+                    platform: CxPlatformTexture::default()
+                };
+
+                // stuff into cx textures
+                let index = cx.textures.len();
+                cx.textures.push(texture);
+
+                // stuff into drawimage
+                self.image.texture = Texture2D(Some(index as u32));
+            }
+
+            // Make a texture (not a cxtexture), get its CxTexture, populate it, and then stuff that into DrawImage
+            if true {
+                let texture = Texture::new(cx);
+                cx.textures[texture.texture_id as usize].desc.width = Some(8);
+                cx.textures[texture.texture_id as usize].desc.height = Some(8);
+                cx.textures[texture.texture_id as usize].image_u32 = pixels2;
+                cx.textures[texture.texture_id as usize].update_image = true;
+
+                // stuff into drawimage
+                self.image.texture = Texture2D(Some(texture.texture_id));
+            }
+
+    },
+    Some(value) => println!("something")
+}
+
+        //image.set_color(cx, Vec4{x:1.0, y:0.0,z:0.0, w:1.0});
+        self.image.draw_quad_abs(cx, Rect{pos:vec2(-0.0,0.5), size:vec2(1.0,1.0)});
+
+
 
         // in this hack i'm pretending i have a scene
         // and then i'm painting what the scene says
@@ -283,6 +404,9 @@ impl WorldView {
                     }
 
                 },
+                3 => {
+
+                }
                 _ => {
 
                 }

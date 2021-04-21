@@ -9,7 +9,7 @@ fn main() {
     /*
 
     // No longer pulled in
-    // This was a test of calling back to a linked objective-c module to do some of the work
+    // This was a test of building entire bindgen headers to ease calling back to a linked objective-c module to do some of the work
     // See https://simlay.net/posts/rust-bindgen-objc-support/
 
     // println!(r"cargo:rustc-link-search=/Users/anselm/orbital/makepad/pluto/avtest");

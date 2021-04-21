@@ -26,9 +26,11 @@ anyhow = "*"
 objc = "*"
 cocoa = "*"
 dispatch = "*"
-# libc = "*"
-# core-foundation = "*"
-# coremedia-sys = "*"
+core-foundation = "*"
+core-media-sys = "*"
+libc = "*"
+block = "*"
+simple-counter="*"
 
 ##########################################################################################
 # these pull in capabilities from makepad - see display.rs
