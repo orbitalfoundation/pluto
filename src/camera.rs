@@ -300,9 +300,6 @@ generate_counter!(Counter, usize);
 
 extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id, _id3: id) {
 
-// i think i need to somehow throw this to some other place...
-// i may be running out of time somehow?
-
     unsafe {
 
         // get timestamp - this crashes...
@@ -360,6 +357,7 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
         // given a CIImage return an NSBitmapImageRep and populate it
         let bitmap: *mut Object = msg_send![class!(NSBitmapImageRep), alloc];
         let _: () = msg_send![bitmap,initWithCIImage: image];
+        NSLog(NSString::alloc(nil).init_str("DATA is %@"),bitmap);
 
         //this works
         let w: u64 = msg_send![bitmap,pixelsWide];
@@ -384,10 +382,10 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
 
                 let pixel = *(raw.add(y*w+x));
 
-                ptr[y*512+x]=pixel;
+                ptr[y*512+x]=pixel.swap_bytes().rotate_right(8);  // target format is ARGB ignoring A, and src format is probaby RGBA
 
                 /*
-                // GET AT PIXELS ATTEMPT #3: CONVERT EACH ONE TO NSColor tediously
+                // GET AT PIXELS ATTEMPT #3: CONVERT EACH ONE TO NSColor tediously -> this works but it is so slow it silently fails because it runs out of time
 
                 // get one pixel as an NSColor -> this works and returns a NSDeviceRGBColorSpace triplet
                 let cspace: *mut Object = msg_send![bitmap, colorAtX:x y:y];
