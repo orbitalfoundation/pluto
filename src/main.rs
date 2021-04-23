@@ -4,8 +4,8 @@
 #[macro_use] extern crate objc;
 
 // seems like a language defect if these macros cannot be down at appropriate scope - pollutes stuff that just does not need to know
-#[macro_use]
-extern crate simple_counter;
+//#[macro_use]
+//extern crate simple_counter;
 
 // this is too monsterously huge to deal with - was testing it up here due to embedded macros - but it has too many pedantic issues and errors
 //include!("../avtest/avtestbind.in");

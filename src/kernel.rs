@@ -25,7 +25,7 @@ pub type SID = u64;
 
 #[derive(Clone)]
 pub enum Message {
-	Share(Arc<Mutex<Box<[u32;262144]>>>),
+	Share(Arc<Mutex<Box<[u32;921600]>>>),
 
 	// register a new channel that can receive traffic
 	Channel(SID,String,Sender<Message>),

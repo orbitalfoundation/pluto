@@ -4,47 +4,6 @@
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// a singleton 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-use std::sync::{Once};
-use std::time::Duration;
-use std::{mem};
-
-#[derive(Clone)]
-struct SingletonReader {
-    // Since we will be used in many threads, we need to protect
-    // concurrent access
-    inner: Arc<Mutex<u8>>,
-    memory: Arc<Mutex<Box<[u32;262144]>>>,
-}
-
-fn singleton() -> SingletonReader {
-
-    static mut SINGLETON: *const SingletonReader = 0 as *const SingletonReader;
-    static ONCE: Once = Once::new();
-
-    unsafe {
-        ONCE.call_once(|| {
-
-            const SIZE: usize = 512*512;
-            let mut memory: Box<[u32;SIZE]> = Box::new([0;SIZE]);
-            let mut sharedmemory = Arc::new(Mutex::new(memory));
-
-            let singleton = SingletonReader {
-                inner: Arc::new(Mutex::new(0)),
-                memory: sharedmemory,
-            };
-
-            SINGLETON = mem::transmute(Box::new(singleton));
-        });
-
-        (*SINGLETON).clone()
-    }
-}
-
-
-/////////////////////////////////////////////////////////////////////////////////////////
 // connect to orbital microkernel
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,8 +33,6 @@ use crate::kernel::*;
 use std::thread;
 use std::sync::Arc;
 use std::sync::Mutex;
-
-static mut mymemory: u32 = 12;
 
 #[derive(Clone)]
 pub struct Camera {}
@@ -118,8 +75,8 @@ impl Serviceable for Camera {
                 // this is done in this thread for now because send is not visible to camera yet
                 // wait so as not to thrash
                 std::thread::sleep(std::time::Duration::from_millis(100));
-                let mut memory = singleton().memory;
-                let messagetosend = Message::Share(memory.clone());
+                let mut sharedmemory = singleton().sharedmemory;
+                let messagetosend = Message::Share(sharedmemory.clone());
                 send.send(messagetosend).expect("error");
 
             }
@@ -162,6 +119,52 @@ fn app_videocapture2() -> Result<(), std::io::Error> {
 
 */
 
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// a singleton due to the appleWebCamCaptureOutput not being able to be a closure
+/////////////////////////////////////////////////////////////////////////////////////////
+
+use std::sync::{Once};
+use std::time::Duration;
+use std::{mem};
+
+#[derive(Clone)]
+struct SingletonReader {
+    // Since we will be used in many threads, we need to protect
+    // concurrent access
+    inner: Arc<Mutex<u8>>,
+    //raw: [u32;921600],
+    //memory: Box<[u32;921600]>,
+    sharedmemory: Arc<Mutex<Box<[u32;921600]>>>,
+}
+
+fn singleton() -> SingletonReader {
+
+    static mut SINGLETON: *const SingletonReader = 0 as *const SingletonReader;
+    static ONCE: Once = Once::new();
+
+    unsafe {
+        ONCE.call_once(|| {
+
+            const SIZE: usize = 1280*720;
+            let mut raw = [0;SIZE];
+            let mut memory = Box::new(raw);
+            let mut sharedmemory = Arc::new(Mutex::new(memory));
+
+            let singleton = SingletonReader {
+                inner: Arc::new(Mutex::new(0)),
+                //raw: raw,
+                //memory: memory,
+                sharedmemory: sharedmemory,
+            };
+
+            SINGLETON = mem::transmute(Box::new(singleton));
+        });
+
+        (*SINGLETON).clone()
+    }
+}
 
 
 
@@ -295,10 +298,13 @@ extern "C" {
     // pub fn CMTimeGetSeconds(time:id) -> f64;
 }
 
-generate_counter!(Counter, usize);
+// generate_counter!(Counter, usize);
 
 
 extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id, _id3: id) {
+
+// hmmm
+   // thread::spawn(move || {
 
     unsafe {
 
@@ -357,7 +363,7 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
         // given a CIImage return an NSBitmapImageRep and populate it
         let bitmap: *mut Object = msg_send![class!(NSBitmapImageRep), alloc];
         let _: () = msg_send![bitmap,initWithCIImage: image];
-        NSLog(NSString::alloc(nil).init_str("DATA is %@"),bitmap);
+        //NSLog(NSString::alloc(nil).init_str("DATA is %@"),bitmap);
 
         //this works
         let w: u64 = msg_send![bitmap,pixelsWide];
@@ -366,23 +372,35 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
         let w = w as usize;
         let h = h as usize;
         let m = m as usize;
-        let raw: *mut u32 = msg_send![bitmap,bitmapData];
+        let rawsrc: *mut u32 = msg_send![bitmap,bitmapData];
 
         // how long is this taking?
-        //use std::time::Instant;
-        //let now = Instant::now();
+        use std::time::Instant;
+        let now = Instant::now();
 
         // write to the raw pixels
-        let memory = singleton().memory;
-        let mut ptr = memory.lock().unwrap();
+        let mut sharedmemory = singleton().sharedmemory;
+        let mut ptr = sharedmemory.lock().unwrap();
+
+        //let rawdest = singleton().raw;
+        //let rawdest: *const u32 = &(rawdest[0]);
+        //let rawdest: *mut u32 = rawdest as *mut u32;
+
+        // have to copy and get out fast due to next frame coming along
+        let rawdest: *mut u32 = ptr.as_ptr() as *mut u32;
+        std::ptr::copy_nonoverlapping(rawsrc,rawdest,720*1280);
+
+        /*
         for y in 0..512{
             for x in 0..512{
 
                 // GET AT PIXELS ATTEMPT #2: GET A POINTER
 
-                let pixel = *(raw.add(y*w+x));
-
-                ptr[y*512+x]=pixel.swap_bytes().rotate_right(8);  // target format is ARGB ignoring A, and src format is probaby RGBA
+                let index = (y*w)+x;
+                let pixel = *(rawsrc.add(index));
+                // go from ARGB to BGRA to ABGR
+                let pixel = pixel.swap_bytes().rotate_right(8);  // target format is ARGB ignoring A, and src format is probaby RGBA
+                ptr[index]=pixel;
 
                 /*
                 // GET AT PIXELS ATTEMPT #3: CONVERT EACH ONE TO NSColor tediously -> this works but it is so slow it silently fails because it runs out of time
@@ -411,22 +429,25 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
 
                 let c = r*65536 + g*256 + b;
 
-                ptr[y*512+x]=c;
+                ptr[y*1280+x]=c;
                 */
             }
         }
+        */
 
         // build a png
-        if false {
-            let filename = format!("result{}.png",Counter::next() );
-            let filename = NSString::alloc(nil).init_str(filename.as_str());
-            let data: *mut Object = msg_send![bitmap, representationUsingType:4 properties: nil];
-            let _: () = msg_send![data, writeToFile: filename atomically: YES];
-        }
+        //if false {
+        //    let filename = format!("result{}.png",Counter::next() );
+        //    let filename = NSString::alloc(nil).init_str(filename.as_str());
+        //    let data: *mut Object = msg_send![bitmap, representationUsingType:4 properties: nil];
+        //    let _: () = msg_send![data, writeToFile: filename atomically: YES];
+        //}
 
         //let elapsed = now.elapsed();
         //println!("The Camera paint routine took {:.2?}",elapsed);
     }
+
+   // });
 
 }
 

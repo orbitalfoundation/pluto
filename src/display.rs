@@ -112,12 +112,12 @@ impl OrbitalBrowserDesktopUX {
         let mut texture = Texture::new(cx);
         texture.set_desc(cx, TextureDesc{
             format: TextureFormat::ImageBGRA,
-            width:Some(512),
-            height:Some(512),
+            width:Some(1280),
+            height:Some(720),
             multisample: None
         });
         let cxtexture = &mut cx.textures[texture.texture_id as usize];
-        cxtexture.image_u32.resize(512*512,0);
+        cxtexture.image_u32.resize(1280*720,0);
 
         Self {
             desktop_window: DesktopWindow::new(cx).with_inner_layout(Layout{
@@ -170,27 +170,29 @@ impl OrbitalBrowserDesktopUX {
                 },
                 Message::Share(sharedmemory) => {
 
-                    println!("display: painting to a texture id = {}",self.image_texture.texture_id);
-
+// TODO fix update_image
                     // i can make a texture again - super duper hack
                     let mut texture = Texture::new(cx);
                     texture.set_desc(cx, TextureDesc{
                         format: TextureFormat::ImageBGRA,
-                        width:Some(512),
-                        height:Some(512),
+                        width:Some(1280),
+                        height:Some(720),
                         multisample: None
                     });
                     let cxtexture = &mut cx.textures[texture.texture_id as usize];
-                    cxtexture.image_u32.resize(512*512,0);
+                    cxtexture.image_u32.resize(1280*720,0);
                     self.image_texture = texture;
+                    println!("display: painting to a texture id = {}",self.image_texture.texture_id);
+                    let texture = self.image_texture;
 
                     // try paint to it again
                     let cxtexture = &mut cx.textures[texture.texture_id as usize];
                     let mut ptr = sharedmemory.lock().unwrap();
-                    for y in 0..512{
-                        for x in 0..512{
-                            let val = ptr[y*512+x];
-                            cxtexture.image_u32[y*512+x]=val;
+                    for y in 0..720{
+                        for x in 0..1280{
+                            let pixel = ptr[y*1280+x];
+                            let pixel = pixel.swap_bytes().rotate_right(8);  // target format is ARGB ignoring A, and src format is probaby RGBA
+                            cxtexture.image_u32[y*1280+x]=pixel;
                         }
                     }
                     cxtexture.update_image = true;
@@ -230,7 +232,7 @@ impl OrbitalBrowserDesktopUX {
 
         if true {
             self.draw_image.texture = self.image_texture.into();
-            self.draw_image.draw_quad_abs(cx, Rect{pos:Vec2{x:100.0,y:100.0},size:Vec2{x:200.0,y:200.0}});
+            self.draw_image.draw_quad_abs(cx, Rect{pos:Vec2{x:100.0,y:100.0},size:Vec2{x:356.0,y:200.0}});
         }
 
         self.desktop_window.end_desktop_window(cx);
