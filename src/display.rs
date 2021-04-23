@@ -1,4 +1,53 @@
 
+
+/*
+
+Browser desktop / main window - apr 2021 thoughts
+
+This is a sketch of what I'm imagining the browser main window will look like and how it will be driven.
+
+There are several ideas that need to be evaluated:
+
+    - userland apps are going to want to open and paint to a view - they should be able to follow well established conventions
+        in the case of the web for example there's an assumption each app having one window or surface, driven by the DOM, and one paints into a canvas
+        i can see an argument for a more flexible approach where userland apps can ask to produce a window and then paint directly into that
+        there is also an idea of all the apps being accessible as separate pages (this is a common browser pattern and in a sense on ios as well)
+
+    - the desktop itself is just another app similar to userland apps but it has a slightly privileged role
+        a portion of it cannot be painted over by userland apps (for security reasons)
+        it offers a hypervisor like ability to enumerate all other apps, get detailed performance and permissions on them, and start/stop them
+        it has a control input box of some kind that is the users first point of entry to the system; similar to a browser URL input bar
+        note that apps are persistent; unlike a browser, they keep running forever
+
+    - userland apps may even paint to the _same_ view; an AR app has a need to have a single view
+        this also means that apps may need some awareness of what other apps are painting to arbitrate visual collisions
+        also there's an argument for a computer vision kind of semantic partitioning capability so that apps can have some spatial understanding
+
+    - userland apps are going to want a well established grammar or dsl or some kind of formalization of how to paint
+        it makes sense to require userland apps to directly ship a shader to the display layer to do work; it's a well established pattern
+        but it may also make sense to offer higher level abstractions as well; even complex objects such as glb or the like
+        in that sense this becomes more like a video game engine; it (optionally) offers a high level DAG and a DSL and a set of conventions...
+
+    - the biggest challenge is in fact devising the right grammar abstraction
+        - how much of this do we need to provide and what can be pushed to higher level third party intermediaries? what existing stuff can be used?
+        - express vertex and pixel shaders in a standards based way; i'd like to expose the live shader idea that makepad has
+        - shaders: exposing basically raw shaders
+        - primitives: 2d colored boxes, fonts, lines, textured surfaces, blit copy regions, pipe rendering flows together
+        - 3d primitives: geometry, constraint based physics, framebuffer effects, geometry extrusions ; this may be in userland (not our job)
+            - see 3js
+            - see babylon3d
+            - see https://guide.nannou.cc/why_nannou.html
+            - see https://bevyengine.org/
+            - see https://rapier.rs/
+        - text input boxes, buttons, scrollbars, divs, layout helpers (see https://github.com/hecrj/iced)
+
+*/
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// here is some glue code to present this desktop as a userland app for the kernel
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 use crossbeam::channel::*;
 use crate::kernel::*;
 
@@ -19,9 +68,7 @@ impl Serviceable for Display {
 	fn start(&self, _name: String, sid: SID, send: Sender<Message>, recv: Receiver<Message> ) {
 
         // listen to display messages
-		send.send(
-		    Message::Subscribe(sid,"/display".to_string())
-		).expect("Display: failed to subscribe");
+		send.send(Message::Subscribe(sid,"/display".to_string())).expect("Display: failed to subscribe");
 
         // open a display -> this never returns for now!!!
         let mut cx = Cx::default();
@@ -44,16 +91,14 @@ impl Serviceable for Display {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// statically declared 2d layout
-// later i think the entire browser desktop "view" should be a wasm blob
-// a traditional browser has tabs, an input box and so on - this is basically the same, with a more desktop feel
-// i imagine a page for apps, and then also a command bar, and then also possibly separate tabs for separate app views
-// for now i just do the work right here - but as mentioned - later most of the work could move away from the "kernel" ... it itself is a view
+// here we jump over to makepad to do real work - this is all just scratch test code right now
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OrbitalBrowserDesktopUX {
     desktop_window: DesktopWindow, 
     menu: Menu,
+    draw_image: DrawImage,
+    image_texture: Texture,
     world_view: WorldView,
     textinput:TextInput,
     button:NormalButton,
@@ -63,25 +108,33 @@ pub struct OrbitalBrowserDesktopUX {
 
 impl OrbitalBrowserDesktopUX {
     pub fn new(cx: &mut Cx, send: Sender<Message>, recv: Receiver<Message>) -> Self {
+
+        let mut texture = Texture::new(cx);
+        texture.set_desc(cx, TextureDesc{
+            format: TextureFormat::ImageBGRA,
+            width:Some(512),
+            height:Some(512),
+            multisample: None
+        });
+        let cxtexture = &mut cx.textures[texture.texture_id as usize];
+        cxtexture.image_u32.resize(512*512,0);
+
         Self {
             desktop_window: DesktopWindow::new(cx).with_inner_layout(Layout{
                 line_wrap: LineWrap::NewLine,
                 ..Layout::default()
             }),
-
             menu:Menu::main(vec![
                 Menu::sub("Example", vec![
                     Menu::line(),
                     Menu::item("Quit Example",  Cx::command_quit()),
                 ]),
             ]),
-
+            draw_image: DrawImage::new(cx, default_shader!()),
             world_view: WorldView::new(cx),
-
+            image_texture: texture,
             textinput: TextInput::new(cx,TextInputOptions { multiline:false, read_only: false, empty_message: "Enter URL here".to_string() }),
-
             button: NormalButton::new(cx),
-
             send:send,
             recv:recv,
         }
@@ -101,18 +154,8 @@ impl OrbitalBrowserDesktopUX {
             match message {
                 Message::Event(topic,data) => {
                     println!("Display: Received: {} {}",topic, data);
-
-// TODO
-// i need to decide on the right level of abstraction
-// i think blobs should probably send display lists or some lower level display commands
-// for now i basically am sending super high level commands as a test
-
                     match data.as_str() {
                         "cube" => {
-                            // hack;
-                            // the idea is that i'd be painting some kind of display of the loaded apps
-                            // TODO this has to interogate the broker or somebody to get an enumeration of all apps...
-                            // TODO so this presumes services at that level
                             let thing = SceneThing { x:0.0, y:0.0, s:0.0, kind:1};
                             self.world_view.add( thing );
                         },
@@ -125,6 +168,34 @@ impl OrbitalBrowserDesktopUX {
                     }
  
                 },
+                Message::Share(sharedmemory) => {
+
+                    println!("display: painting to a texture id = {}",self.image_texture.texture_id);
+
+                    // i can make a texture again - super duper hack
+                    let mut texture = Texture::new(cx);
+                    texture.set_desc(cx, TextureDesc{
+                        format: TextureFormat::ImageBGRA,
+                        width:Some(512),
+                        height:Some(512),
+                        multisample: None
+                    });
+                    let cxtexture = &mut cx.textures[texture.texture_id as usize];
+                    cxtexture.image_u32.resize(512*512,0);
+                    self.image_texture = texture;
+
+                    // try paint to it again
+                    let cxtexture = &mut cx.textures[texture.texture_id as usize];
+                    let mut ptr = sharedmemory.lock().unwrap();
+                    for y in 0..512{
+                        for x in 0..512{
+                            let val = ptr[y*512+x];
+                            cxtexture.image_u32[y*512+x]=val;
+                        }
+                    }
+                    cxtexture.update_image = true;
+
+                }
                 _ => { },
             }
         }
@@ -150,29 +221,34 @@ impl OrbitalBrowserDesktopUX {
             return
         };
         self.world_view.draw_world_view_2d(cx);
-
+            
         cx.reset_turtle_pos();
 
         self.button.draw_normal_button(cx, "GO");
 
         self.textinput.draw_text_input(cx);
 
+        if true {
+            self.draw_image.texture = self.image_texture.into();
+            self.draw_image.draw_quad_abs(cx, Rect{pos:Vec2{x:100.0,y:100.0},size:Vec2{x:200.0,y:200.0}});
+        }
+
         self.desktop_window.end_desktop_window(cx);
     }
 }
 
 
-
-
-
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 3d immediate mode
+// 3d immediate mode test
+//
+// this is throwaway code, here i'm exploring these ideas
+//
+//  - should there be a scenegraph representation? i'd prefer to avoid this -> prefer to require userland apps to pass shaders
+//  - but if there is; what are reasonable scene graph nodes?
+//  - what if multiple apps want to paint to the same window? whats a good collision avoidance policy?
+//
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// hack; there would be some kind of enum or struct of primitives in some kind of scene graph?
-// hack; and i think there are hashes so that collections belonging to one sponsor are shown depending on foreground app?
 #[derive(Clone)]
 pub struct SceneThing {
     pub x: f64,
@@ -187,11 +263,9 @@ pub struct WorldView {
     pub time: f64,
     pub sky_box: SkyBox,
     pub cube: DrawCube,
-    pub image: DrawImage,
     pub viewport_3d: Viewport3D,
     pub next_frame: NextFrame,
     pub scene: Vec<SceneThing>,
-    pub mytex: usize,
 }
 
 impl WorldView {
@@ -204,9 +278,7 @@ impl WorldView {
             next_frame: NextFrame::default(),
             sky_box: SkyBox::new(cx),
             cube: DrawCube::new(cx, default_shader!()),
-            image: DrawImage::new(cx, default_shader!()),
             scene: Vec::new(),
-            mytex: 0, //make_texture(),
         }
     }
     
@@ -219,64 +291,21 @@ impl WorldView {
             self::color_bg: #222222;
         "#);
     }
-    
+
     pub fn handle_world_view(&mut self, cx: &mut Cx, event: &mut Event) {
-        // do 2D camera interaction.
-        self.viewport_3d.handle_viewport_2d(cx, event);
-        
+        self.viewport_3d.handle_viewport_2d(cx, event);        
         if let Some(ae) = event.is_next_frame(cx, self.next_frame) {
             self.time = ae.time;
             self.view.redraw_view(cx);
         } 
     }
     
-    pub fn draw_world_view_2d(&mut self, cx: &mut Cx) {
-        
+    pub fn draw_world_view_2d(&mut self, cx: &mut Cx) {        
         if self.viewport_3d.begin_viewport_3d(cx).is_ok() {
             self.draw_world_view_3d(cx);
             self.viewport_3d.end_viewport_3d(cx)
         };
-        
-        // lets draw it
         self.viewport_3d.draw_viewport_2d(cx);
-    }
-
-
-
-    pub fn make_texture(&mut self, cx: &mut Cx) ->usize {
-
-        if self.mytex == 0 {
-
-            let pixels: Vec<u32> = vec![
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-            ];
-
-            let texture = CxTexture {
-                desc: TextureDesc {
-                    format: TextureFormat::ImageBGRA,
-                    width: Some(8),
-                    height: Some(8),
-                    multisample: None
-                },
-                image_u32: pixels,
-                image_f32: Vec::new(),
-                update_image: true,
-                platform: CxPlatformTexture::default()
-            };
-
-            self.mytex = cx.textures.len();
-            cx.textures.push(texture);
-            println!("cx textures has len={}",self.mytex);
-        }
-
-        self.mytex
     }
     
     pub fn draw_world_view_3d(&mut self, cx: &mut Cx) {
@@ -288,81 +317,6 @@ impl WorldView {
         self.view.lock_view_transform(cx, &Mat4::identity());
         
         self.sky_box.draw_sky_box(cx);
-
-// get image
-//let mut image = DrawImage::new(cx, default_shader!());
-
-let Texture2D(fuckingtuples) = self.image.texture;
-match fuckingtuples {
-    None => {
-
-            // some pixels
-            let pixels: Vec<u32> = vec![
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-            ];
-
-            // some pixels
-            let pixels2: Vec<u32> = vec![
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-                0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff, 0xff0088ff,
-            ];
-
-            // Populate a cx texture from scratch, stuff it into cx.textures and DrawImage
-            if false {
-                let texture = CxTexture {
-                    desc: TextureDesc {
-                        format: TextureFormat::ImageBGRA,
-                        width: Some(8),
-                        height: Some(8),
-                        multisample: None
-                    },
-                    image_u32: pixels,
-                    image_f32: Vec::new(),
-                    update_image: true,
-                    platform: CxPlatformTexture::default()
-                };
-
-                // stuff into cx textures
-                let index = cx.textures.len();
-                cx.textures.push(texture);
-
-                // stuff into drawimage
-                self.image.texture = Texture2D(Some(index as u32));
-            }
-
-            // Make a texture (not a cxtexture), get its CxTexture, populate it, and then stuff that into DrawImage
-            if true {
-                let texture = Texture::new(cx);
-                cx.textures[texture.texture_id as usize].desc.width = Some(8);
-                cx.textures[texture.texture_id as usize].desc.height = Some(8);
-                cx.textures[texture.texture_id as usize].image_u32 = pixels2;
-                cx.textures[texture.texture_id as usize].update_image = true;
-
-                // stuff into drawimage
-                self.image.texture = Texture2D(Some(texture.texture_id));
-            }
-
-    },
-    Some(value) => println!("something")
-}
-
-        //image.set_color(cx, Vec4{x:1.0, y:0.0,z:0.0, w:1.0});
-        self.image.draw_quad_abs(cx, Rect{pos:vec2(-0.0,0.5), size:vec2(1.0,1.0)});
-
-
 
         // in this hack i'm pretending i have a scene
         // and then i'm painting what the scene says
@@ -418,6 +372,7 @@ match fuckingtuples {
     }
     
 } 
+
 
 
 #[derive(Clone)]

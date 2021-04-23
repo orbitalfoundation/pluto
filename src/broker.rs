@@ -3,6 +3,11 @@ use crossbeam::channel::*;
 use crate::kernel::*;
 use crate::wasm::*;
 
+use std::thread;
+use std::sync::Arc;
+use std::sync::Mutex;
+
+
 #[derive(Clone)]
 pub struct Broker {
 }
@@ -46,8 +51,21 @@ impl Serviceable for Broker {
 		                registry[&sid].subscriptions.borrow_mut().remove(&topic);
 		            },
 
+		            // hack, forward share objects...
+		            Message::Share(sharedmemory) => {
+		            	// repost event objects 
+		                for target in &registry {
+		                    if target.1.subscriptions.borrow_mut().contains(&"/display".to_string()) {
+			                    //let mut ptr = sharedmemory.lock().unwrap();
+				                //let mut sharedmemory = Arc::new(Mutex::new(Box::new(ptr)));
+		                        let _res = target.1.send.send(Message::Share(sharedmemory));
+		                        break;
+		                    }
+		                }
+		            },
+
 		            Message::Event(topic,data) => {
-		            	// most events go to other services
+		            	// repost event objects 
 		                for target in &registry {
 		                    if target.1.subscriptions.borrow_mut().contains(&topic) {
 		                        let _res = target.1.send.send(Message::Event(topic.clone(),data.clone()));
@@ -136,7 +154,9 @@ impl Serviceable for Broker {
 
 		            },
 
+		            _ => {
 
+		            }
 		    	}
 		    }
 		});

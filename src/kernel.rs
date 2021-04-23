@@ -3,6 +3,9 @@
 // Desmond Germans, Ph.D; www.germansmedia.nl
 
 use crossbeam::channel::*;
+use std::thread;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 ///
 /// SID
@@ -22,6 +25,7 @@ pub type SID = u64;
 
 #[derive(Clone)]
 pub enum Message {
+	Share(Arc<Mutex<Box<[u32;262144]>>>),
 
 	// register a new channel that can receive traffic
 	Channel(SID,String,Sender<Message>),
@@ -45,6 +49,7 @@ pub enum Message {
 	//AddInstance(Box<dyn Serviceable>),
 	// https://www.reddit.com/r/rust/comments/7q3bz8/trait_object_with_clone/
 	// https://www.reddit.com/r/rust/comments/8q0602/a_generic_trait_for_cloning_boxed_trait_objects/
+
 }
 
 pub trait Serviceable: ServiceableClone {
