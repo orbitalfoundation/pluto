@@ -55,7 +55,7 @@ impl Serviceable for Camera {
         // start a separate thread to watch for commands
         let _thread = std::thread::Builder::new().name(name.to_string()).spawn(move || {
 
-            // wait till display is up
+            // wait till display is up - basically a hack - can remove
             std::thread::sleep(std::time::Duration::from_millis(2000));
 
             loop {
@@ -72,9 +72,11 @@ impl Serviceable for Camera {
                     }
                 }
 
-                // this is done in this thread for now because send is not visible to camera yet
                 // wait so as not to thrash
                 std::thread::sleep(std::time::Duration::from_millis(100));
+
+                // i build the ram in a singleton because of the avfoundation callback mostly - otherwise i'd build it here
+                // however this send is done in this thread for now because send is not visible to camera callback - also i want to throttle traffic
                 let mut sharedmemory = singleton().sharedmemory;
                 let messagetosend = Message::Share(sharedmemory.clone());
                 send.send(messagetosend).expect("error");
@@ -303,8 +305,8 @@ extern "C" {
 
 extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id, _id3: id) {
 
-// hmmm
-   // thread::spawn(move || {
+    // hmmm - TODO should build a system where this doesn't get overloaded
+    // thread::spawn(move || {
 
     unsafe {
 

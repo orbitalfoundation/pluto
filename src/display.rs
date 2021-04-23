@@ -94,6 +94,11 @@ impl Serviceable for Display {
 // here we jump over to makepad to do real work - this is all just scratch test code right now
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+extern crate rustface;
+use rustface::{Detector, FaceInfo, ImageData};
+
+const BUFSIZE : usize = 1280*720/4;
+
 pub struct OrbitalBrowserDesktopUX {
     desktop_window: DesktopWindow, 
     menu: Menu,
@@ -104,6 +109,8 @@ pub struct OrbitalBrowserDesktopUX {
     button:NormalButton,
     send:Sender<Message>,
     recv:Receiver<Message>,
+    detector:Box<dyn Detector>,
+    buffer:Box<[u8;BUFSIZE]>,
 }
 
 impl OrbitalBrowserDesktopUX {
@@ -118,6 +125,15 @@ impl OrbitalBrowserDesktopUX {
         });
         let cxtexture = &mut cx.textures[texture.texture_id as usize];
         cxtexture.image_u32.resize(1280*720,0);
+
+        let mut detector = rustface::create_detector("seeta_fd_frontal_v1.0.bin").unwrap();
+        detector.set_min_face_size(20);
+        detector.set_score_thresh(2.0);
+        detector.set_pyramid_scale_factor(0.8);
+        detector.set_slide_window_step(4, 4);
+        println!("loaded face detector");
+
+        let mut buffer = Box::new([0u8;BUFSIZE]);
 
         Self {
             desktop_window: DesktopWindow::new(cx).with_inner_layout(Layout{
@@ -137,6 +153,8 @@ impl OrbitalBrowserDesktopUX {
             button: NormalButton::new(cx),
             send:send,
             recv:recv,
+            detector:detector,
+            buffer:buffer,
         }
     }
     
@@ -170,22 +188,8 @@ impl OrbitalBrowserDesktopUX {
                 },
                 Message::Share(sharedmemory) => {
 
-// TODO fix update_image
-                    // i can make a texture again - super duper hack
-                    let mut texture = Texture::new(cx);
-                    texture.set_desc(cx, TextureDesc{
-                        format: TextureFormat::ImageBGRA,
-                        width:Some(1280),
-                        height:Some(720),
-                        multisample: None
-                    });
-                    let cxtexture = &mut cx.textures[texture.texture_id as usize];
-                    cxtexture.image_u32.resize(1280*720,0);
-                    self.image_texture = texture;
-                    println!("display: painting to a texture id = {}",self.image_texture.texture_id);
+                    // paint to texture
                     let texture = self.image_texture;
-
-                    // try paint to it again
                     let cxtexture = &mut cx.textures[texture.texture_id as usize];
                     let mut ptr = sharedmemory.lock().unwrap();
                     for y in 0..720{
@@ -196,6 +200,52 @@ impl OrbitalBrowserDesktopUX {
                         }
                     }
                     cxtexture.update_image = true;
+
+for y in 0..360{
+    for x in 0..640{
+        let pixel = ptr[y*1280*2+x*2];
+        //let pixel = pixel.swap_bytes(); //.rotate_right(8);  // target format is ARGB ignoring A, and src format is probaby RGBA
+        let pixel = pixel as u8;
+        self.buffer[y*640+x]=pixel;
+    }
+}
+let mut image = ImageData::new(self.buffer.as_mut(), 640, 360);
+for face in self.detector.detect(&mut image).into_iter() {
+    let x = 2 * face.bbox().x() as usize;
+    let y = 2 * face.bbox().y() as usize;
+    let w = 2 * face.bbox().width() as usize;
+    let h = 2 * face.bbox().height() as usize;
+    if h < 20 { break; }
+    if w < 20 { break; }
+    if w > 400 { break; }
+    if h > 400 { break; }
+    if y < 40 { break };
+    if y + h > 700 { break; }
+    if x < 40 { break; };;;;
+    if x + w > 1240 { break }
+    for i in 0 .. w {
+        cxtexture.image_u32[y*1280+x+i]=0xff00ff00;
+        cxtexture.image_u32[y*1280+x+i+1280]=0xff00ff00;
+        cxtexture.image_u32[y*1280+x+i+1280+1280]=0xff00ff00;
+
+        cxtexture.image_u32[(y+h)*1280+x+i]=0xff00ff00;
+        cxtexture.image_u32[(y+h)*1280+x+i+1280]=0xff00ff00;
+        cxtexture.image_u32[(y+h)*1280+x+i+1280+1280]=0xff00ff00;
+    }
+
+    for i in 0 .. h {
+        cxtexture.image_u32[(y+i)*1280+x]=0xff00ff00;
+        cxtexture.image_u32[(y+i)*1280+x+1]=0xff00ff00;
+        cxtexture.image_u32[(y+i)*1280+x+2]=0xff00ff00;
+
+        cxtexture.image_u32[(y+i)*1280+x+w]=0xff00ff00;
+        cxtexture.image_u32[(y+i)*1280+x+w+1]=0xff00ff00;
+        cxtexture.image_u32[(y+i)*1280+x+w+2]=0xff00ff00;
+    }
+
+}
+//found face: FaceInfo { bbox: Rectangle { x: 239, y: 149, width: 136, height: 136 }, roll: 0.0, pitch: 0.0, yaw: 0.0, score: 21.411842465400696 }
+
 
                 }
                 _ => { },
