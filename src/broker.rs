@@ -3,9 +3,9 @@ use crossbeam::channel::*;
 use crate::kernel::*;
 use crate::wasm::*;
 
-use std::thread;
-use std::sync::Arc;
-use std::sync::Mutex;
+//use std::thread;
+//use std::sync::Arc;
+//use std::sync::Mutex;
 
 
 #[derive(Clone)]
@@ -154,9 +154,7 @@ impl Serviceable for Broker {
 
 		            },
 
-		            _ => {
-
-		            }
+		            //_ => {}
 		    	}
 		    }
 		});

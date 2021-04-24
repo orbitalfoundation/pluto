@@ -1,7 +1,6 @@
 
-// This has to be first
+// apple naming convention support just to be more consistent around our mocks
 #![allow(non_snake_case)]
-
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // connect to orbital microkernel
@@ -30,7 +29,7 @@
 use crossbeam::channel::*;
 use crate::kernel::*;
 
-use std::thread;
+//use std::thread;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -77,7 +76,7 @@ impl Serviceable for Camera {
 
                 // i build the ram in a singleton because of the avfoundation callback mostly - otherwise i'd build it here
                 // however this send is done in this thread for now because send is not visible to camera callback - also i want to throttle traffic
-                let mut sharedmemory = singleton().sharedmemory;
+                let sharedmemory = singleton().sharedmemory;
                 let messagetosend = Message::Share(sharedmemory.clone());
                 send.send(messagetosend).expect("error");
 
@@ -128,7 +127,7 @@ fn app_videocapture2() -> Result<(), std::io::Error> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 use std::sync::{Once};
-use std::time::Duration;
+//use std::time::Duration;
 use std::{mem};
 
 #[derive(Clone)]
@@ -150,9 +149,9 @@ fn singleton() -> SingletonReader {
         ONCE.call_once(|| {
 
             const SIZE: usize = 1280*720;
-            let mut raw = [0;SIZE];
-            let mut memory = Box::new(raw);
-            let mut sharedmemory = Arc::new(Mutex::new(memory));
+            let raw = [0;SIZE];
+            let memory = Box::new(raw);
+            let sharedmemory = Arc::new(Mutex::new(memory));
 
             let singleton = SingletonReader {
                 inner: Arc::new(Mutex::new(0)),
@@ -250,7 +249,7 @@ extern { pub fn NSLog(fmt: *mut Object, ...); }
 // NSString
 
 use cocoa::foundation::NSString;
-use cocoa::appkit::NSColor;
+//use cocoa::appkit::NSColor;
 
 // various ways I can get at strings and manipulate them 
 // use std::ffi::CString;
@@ -263,10 +262,11 @@ use cocoa::appkit::NSColor;
 
 // ----------------------------------------------------------------------------------------------------
 // cocoa::base - provides a selector builder also
+
 //#[allow(non_upper_case_globals)]
 //type id = *mut Object;
 //const nil: id = 0 as Id;
-use cocoa::base::{nil, id, NO, YES};
+use cocoa::base::{nil, id};
 
 // ----------------------------------------------------------------------------------------------------
 // trying to get at some of these methods; seems easiest to just use id
@@ -290,12 +290,12 @@ pub type CMSampleBufferRef = *mut opaqueCMSampleBuffer;
 
 extern "C" {
     pub fn CMSampleBufferGetImageBuffer(buffer: id) -> id;
-    pub fn CVPixelBufferGetBaseAddress(buffer:id) -> id;
-    pub fn CVPixelBufferLockBaseAddress(buffer:id,flags:u64);
-    pub fn CVPixelBufferUnlockBaseAddress(buffer:id,flags:u64);
-    pub fn CVPixelBufferGetWidth(buffer:id) -> u64;
-    pub fn CVPixelBufferGetHeight(buffer:id) -> u64;
-    pub fn CVPixelBufferGetBaseAddressOfPlane(buffer:id,flags:u64) -> id;
+    //pub fn CVPixelBufferGetBaseAddress(buffer:id) -> id;
+    //pub fn CVPixelBufferLockBaseAddress(buffer:id,flags:u64);
+    //pub fn CVPixelBufferUnlockBaseAddress(buffer:id,flags:u64);
+    //pub fn CVPixelBufferGetWidth(buffer:id) -> u64;
+    //pub fn CVPixelBufferGetHeight(buffer:id) -> u64;
+    //pub fn CVPixelBufferGetBaseAddressOfPlane(buffer:id,flags:u64) -> id;
     // pub fn CMSampleBufferGetOutputPresentationTimeStamp(buffer:id) -> id;
     // pub fn CMTimeGetSeconds(time:id) -> f64;
 }
@@ -359,8 +359,8 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
         //    println!("peering at raw buffer {}",val);
 
         // some queries work...
-        let width = CVPixelBufferGetWidth(ibuf);
-        let height = CVPixelBufferGetHeight(ibuf);
+        //let width = CVPixelBufferGetWidth(ibuf);
+        //let height = CVPixelBufferGetHeight(ibuf);
 
         // given a CIImage return an NSBitmapImageRep and populate it
         let bitmap: *mut Object = msg_send![class!(NSBitmapImageRep), alloc];
@@ -368,21 +368,21 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
         //NSLog(NSString::alloc(nil).init_str("DATA is %@"),bitmap);
 
         //this works
-        let w: u64 = msg_send![bitmap,pixelsWide];
-        let h: u64 = msg_send![bitmap,pixelsHigh];
-        let m: u64 = msg_send![bitmap,bytesPerRow];
-        let w = w as usize;
-        let h = h as usize;
-        let m = m as usize;
+        //let w: u64 = msg_send![bitmap,pixelsWide];
+        //let h: u64 = msg_send![bitmap,pixelsHigh];
+        //let m: u64 = msg_send![bitmap,bytesPerRow];
+        //let w = w as usize;
+        //let h = h as usize;
+        //let m = m as usize;
         let rawsrc: *mut u32 = msg_send![bitmap,bitmapData];
 
         // how long is this taking?
-        use std::time::Instant;
-        let now = Instant::now();
+        //use std::time::Instant;
+        //let now = Instant::now();
 
         // write to the raw pixels
-        let mut sharedmemory = singleton().sharedmemory;
-        let mut ptr = sharedmemory.lock().unwrap();
+        let sharedmemory = singleton().sharedmemory;
+        let ptr = sharedmemory.lock().unwrap();
 
         //let rawdest = singleton().raw;
         //let rawdest: *const u32 = &(rawdest[0]);
@@ -457,10 +457,6 @@ extern fn appleWebCamCaptureOutput(_this: &Object, _cmd: Sel, _id1: id, sbuf: id
 
 fn appleWebCamCaptureStart() {
     unsafe {
-
-        let myc = |_this: &Object, _cmd: Sel, _id1: id, buffer: id, _id3: id | {
-            println!("got video");
-        };
 
         // MAKE A DEVICE
         let AVMediaTypeVideo = NSString::alloc(nil).init_str(&"vide".to_string());

@@ -10,7 +10,6 @@
 // this is too monsterously huge to deal with - was testing it up here due to embedded macros - but it has too many pedantic issues and errors
 //include!("../avtest/avtestbind.in");
 
-
 // all built in pieces
 
 mod kernel;
