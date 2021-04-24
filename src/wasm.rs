@@ -68,39 +68,47 @@ use wasmtime::*;
 use anyhow::Result;
 //use wasmtime_wasi::{sync::WasiCtxBuilder, Wasi};
 
-/*
-
-    //let send2 = send.clone();
-    let func1 = Func::wrap(&store,move || {
-        println!("callback1");
-        //let _ = send2.send(Message::Event("/camera".to_string(),"WASM->Camera: Give me a Frame".to_string()));
-        //let _ = send2.send(Message::Event("/display".to_string(),"WASM->Display: Show Frame".to_string()));
-        //let _ = send.send(Message::Event("/display".to_string(),"cube".to_string()));
-    });
-*/
 
 fn wasm2(name: String, _send: Sender<Message>,_recv:Receiver<Message>) -> Result<(), Box<dyn Error>> {
 
+    let send2 = _send.clone();
+
+    // start engine once
     println!("Initializing...");
     let engine = Engine::default();
     let store = Store::new(&engine);
 
-    // Compile.
+    // compile code once
     println!("Compiling module...");
     let module = Module::from_file(&engine,name)?;
 
-    // Create external print functions.
-    println!("Creating callback...");
+    // attach callbacks
+
+    let orbital_dowork_func = move |a:i32, b:i32 | {
+        println!("wasm::orbital::dowork called");
+        //let _ = send2.send(Message::Event("/camera".to_string(),"WASM->Camera: Give me a Frame".to_string()));
+        //let _ = send2.send(Message::Event("/display".to_string(),"WASM->Display: Show Frame".to_string()));
+        let _ = send2.send(Message::Event("/display".to_string(),"manycubes".to_string()));
+    };
+
+    let orbital_dowork_func = Func::wrap(&store,orbital_dowork_func);
+
+    /*
     let drawcube_type = FuncType::new([ValType::I32, ValType::I32].iter().cloned(),[].iter().cloned());
-    let drawcube_func = Func::new(&store, drawcube_type, |_, args, _results| {
+    let drawcube_func = |args1: i32, args2 :i32 , _results :i32| {
         println!("Calling back...");
         println!("... {} {}", args[0].unwrap_i32(), args[1].unwrap_i32());
+        //let _ = send2.send(Message::Event("/display".to_string(),"cubes".to_string()));
         Ok(())
-    });
+    };
+    */
+    //let add = Func::wrap(&store, |a: i32, b: i32| -> i32 { a + b });
+    //let double = Func::new(&store, double_type, |_, params, results| {
+    //let drawcube_func = Func::new(&store, drawcube_type, drawcube_func);
 
     // Instantiate.
     println!("Instantiating module...");
-    let instance = Instance::new(&store, &module, &[drawcube_func.into()])?;
+    let instance = Instance::new(&store, &module, &[orbital_dowork_func.into()])?;
 
     // Extract exports.
     println!("Extracting export...");

@@ -1,16 +1,29 @@
-# Prototype R4
+# Orbital Prototype R4
 
-## USAGE
+## USAGE R4
 
-cargo run -p pluto
-this will bring up a display
-then you should manually type in the name of the wasm blob you want to run... and then hit the "go" button
-i have built a couple of test apps that are wasm blobs, they start firing off events to drive the system
-	friendfinder.wat -> the idea here is eventually it is a video camera face segmenter as a test
-	cubes.wasm -> just draw a pile of cubes
+git checkout https://github.com/orbitalweb/rev1
+cd rev1
+cargo run --release
 
-* right now i just treat each wasm blob as basically what would be the equivalent of a much richer "package" describing a persistent app
-	apps will exist partially on the client and may have assets and stuff all over the net... so the initial blob is kinda a manifest of what to do
+This currently runs ONLY on a macbook pro - and it needs to be a fast machine.
+
+Current test:
+	- the current test brings up a browser window
+	- a webcam is started automatically
+	- face segmentation is started automatically
+	- you can type in an URL in the menu bar at the top of the screen
+		- you may have to hit delete your text is backwards (this is a bug)
+		- you have to hit the go button after you type in your text
+		- cubes.wasm -> load some cubes
+		- friendfinder.wat -> face finder -> turned on always for now
+
+## NEXT
+
+	- a richer concept of a manifest
+	- support for javascript
+	- support for first class windows and displays per app
+	- support for a richer desktop with fine grained app controls
 
 ## What is this?
 
