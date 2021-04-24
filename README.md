@@ -6,17 +6,20 @@ git checkout https://github.com/orbitalweb/rev1
 cd rev1
 cargo run --release
 
-This currently runs ONLY on a macbook pro - and it needs to be a fast machine.
+This currently runs ONLY on a macbook pro - and it needs to be a fast machine. This is all experimental.
+
+Notably I bind Rust to Apple objective-c AVFoundation to capture Camera input with CMSampleBufferGetImageBuffer and get an NSBitmapImageRep and a CIImage and then copy the raw pixels to a buffer for some simple computer vision work. That may be helpful for other projects at least. I may get around to packaging that as a separate crate as well.
 
 Current test:
+
 	- the current test brings up a browser window
 	- a webcam is started automatically
 	- face segmentation is started automatically
 	- you can type in an URL in the menu bar at the top of the screen
-		- you may have to hit delete your text is backwards (this is a bug)
-		- you have to hit the go button after you type in your text
-		- cubes.wasm -> load some cubes
-		- friendfinder.wat -> face finder -> turned on always for now
+	- you may have to hit delete your text is backwards (this is a bug)
+	- you have to hit the go button after you type in your text
+	- cubes.wasm -> load some cubes
+	- friendfinder.wat -> face finder -> turned on always for now
 
 ## NEXT
 
